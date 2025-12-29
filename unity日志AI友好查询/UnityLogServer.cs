@@ -147,6 +147,9 @@ namespace AssetsTools
 
                 // 写入端口文件
                 WritePortFile(s_CurrentPort);
+
+                // 打印启动日志
+                Debug.Log($"[UnityLogServer] Server started on port {s_CurrentPort}");
             }
             catch (Exception ex)
             {
@@ -530,6 +533,9 @@ namespace AssetsTools
                 {
                     s_LogQueue?.Clear();
                 }
+
+                // 打印停止日志
+                Debug.Log($"[UnityLogServer] Server stopped");
             }
             catch (Exception ex)
             {
