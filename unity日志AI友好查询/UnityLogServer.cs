@@ -219,6 +219,10 @@ namespace AssetsTools
                     }
                     Thread.Sleep(10);
                 }
+                catch (System.Threading.ThreadAbortException)
+                {
+                    // 线程被强行中止（通常是Unity关闭时），这是正常行为，不要报错，静默处理即可。
+                }
                 catch (Exception ex)
                 {
                     if (s_IsRunning)
