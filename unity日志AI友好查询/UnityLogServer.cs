@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -85,6 +86,11 @@ namespace AssetsTools
         private static Queue<LogEntry> s_LogQueue;
         private static readonly object s_LockObj = new object();
 
+        // Console Clear 检测相关
+        private static MethodInfo s_LogEntriesGetCountMethod;
+        private static int s_LastConsoleLogCount;
+        private static float s_LastClearCheckTime;
+
         static UnityLogServer()
         {
             Initialize();
@@ -104,6 +110,9 @@ namespace AssetsTools
 
             // 注册退出回调
             EditorApplication.quitting += OnQuit;
+
+            // 初始化 Console Clear 检测
+            InitializeConsoleClearCheck();
 
             // 启动TCP服务器
             StartServer();
@@ -183,6 +192,99 @@ namespace AssetsTools
                     s_Listener = null;
                 }
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 初始化 Console Clear 检测功能
+        /// </summary>
+        private static void InitializeConsoleClearCheck()
+        {
+            try
+            {
+                // 通过反射获取 LogEntries.GetCount 方法
+                var logEntriesType = typeof(EditorApplication).Assembly.GetType("UnityEditor.LogEntries");
+                if (logEntriesType != null)
+                {
+                    s_LogEntriesGetCountMethod = logEntriesType.GetMethod("GetCount", BindingFlags.Static | BindingFlags.Public);
+                }
+
+                // 初始化上次的日志数量
+                if (s_LogEntriesGetCountMethod != null)
+                {
+                    try
+                    {
+                        s_LastConsoleLogCount = (int)s_LogEntriesGetCountMethod.Invoke(null, null);
+                    }
+                    catch
+                    {
+                        s_LastConsoleLogCount = 0;
+                    }
+                }
+                else
+                {
+                    s_LastConsoleLogCount = 0;
+                }
+
+                s_LastClearCheckTime = Time.realtimeSinceStartup;
+
+                // 注册 EditorApplication.update 回调
+                EditorApplication.update += CheckConsoleClear;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[UnityLogServer] InitializeConsoleClearCheck error: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// 检测 Console Clear 事件
+        /// </summary>
+        private static void CheckConsoleClear()
+        {
+            // 每 0.5 秒检查一次，避免过于频繁
+            float currentTime = Time.realtimeSinceStartup;
+            if (currentTime - s_LastClearCheckTime < 0.5f)
+            {
+                return;
+            }
+            s_LastClearCheckTime = currentTime;
+
+            try
+            {
+                if (s_LogEntriesGetCountMethod == null)
+                {
+                    return;
+                }
+
+                // 获取当前 Console 中的日志数量
+                int currentCount = (int)s_LogEntriesGetCountMethod.Invoke(null, null);
+
+                // 检测日志数量是否骤降（从较多日志变为很少或0）
+                // 判断条件：上次数量 > 10 且 当前数量 < 上次数量的一半 且 当前数量 < 5
+                if (s_LastConsoleLogCount > 10 && currentCount < s_LastConsoleLogCount / 2 && currentCount < 5)
+                {
+                    // 检测到 Console Clear，清空我们的日志缓存
+                    ClearLogCache();
+                    Debug.Log("[UnityLogServer] Console cleared, log cache synchronized");
+                }
+
+                s_LastConsoleLogCount = currentCount;
+            }
+            catch (Exception ex)
+            {
+                // 静默处理异常，避免频繁报错
+            }
+        }
+
+        /// <summary>
+        /// 清空日志缓存
+        /// </summary>
+        private static void ClearLogCache()
+        {
+            lock (s_LockObj)
+            {
+                s_LogQueue.Clear();
             }
         }
 
@@ -516,7 +618,11 @@ namespace AssetsTools
 
             try
             {
+                // 取消注册日志回调
                 Application.logMessageReceived -= HandleLog;
+
+                // 取消注册 Console Clear 检测回调
+                EditorApplication.update -= CheckConsoleClear;
 
                 if (s_ServerThread != null && s_ServerThread.IsAlive)
                 {
