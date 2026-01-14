@@ -16,7 +16,7 @@
  * - 日志消息: {"type":"log","data":{timestamp,message,stackTrace,logType}}
  * - 清空消息: {"type":"clear"}
  * - 查询消息: {"type":"query","data":{count?,minutes?,keyword?,fuzzy?,regex?,client?}}
- * 注意!此服务端让用户自己手动启动!!!
+ * 注意!此服务端让用户自己手动启动!!!,用户没启动就友好提醒用户启动
  */
 
 const net = require("net");
