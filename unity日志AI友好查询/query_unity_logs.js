@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
 const net = require("net");
-const path = require("path");
-const os = require("os");
 
 // 配置常量
-const DEFAULT_PORT = 6800;
+const PORT = 6800;
 const HOST = "127.0.0.1";
 const MAX_COUNT = 200;
 const MAX_MINUTES = 60;
@@ -26,27 +23,30 @@ UnityLogServer 查询工具
     --keyword "<text>"     严格关键词匹配
     --fuzzy "<text>"       模糊关键词匹配
     --regex "<pattern>"    正则表达式匹配
+    --client "<name>"      按客户端筛选 (模糊匹配,如 "Unity-1" 或 "ProjectName")
 
 参数组合规则:
     - count 和 minutes 不能同时使用
     - keyword / fuzzy / regex 不能同时使用
     - 至少需要一个查询参数
-    - 可组合: count/minutes + keyword/fuzzy/regex
+    - 可组合: count/minutes + keyword/fuzzy/regex + client
 
 示例:
     node query_unity_logs.js --count 20
     node query_unity_logs.js --minutes 5 --fuzzy "error"
     node query_unity_logs.js --keyword "Error"
     node query_unity_logs.js --count 50 --regex "Error.*player"
+    node query_unity_logs.js --count 20 --client "Unity-1"
+    node query_unity_logs.js --count 50 --client "RXJH"
 
 其他选项:
     --help                 显示此帮助信息
 
 输出格式:
-    结果包含每条日志的时间戳、类型、消息和堆栈信息（如果有）
+    结果包含每条日志的客户端ID、时间戳、类型、消息和堆栈信息（如果有）
 
 注意!!!:
-    使用命令获取日志前MUST提示用户手动触发需要的日志!!!用户告知后再运行命令获取日志
+    使用命令获取日志前,如果需要用户手动触发日志,MUST先整理出触发日志操作流程,回复给用户!!!在用户告知后再运行命令获取日志
 `);
 }
 
@@ -78,6 +78,9 @@ function parseArgs() {
       case "--regex":
         params.regex = args[++i];
         break;
+      case "--client":
+        params.client = args[++i];
+        break;
       default:
         if (arg.startsWith("--")) {
           console.error(`❌ 未知参数: ${arg}`);
@@ -98,8 +101,16 @@ function validateParams(params) {
   const hasKeyword = params.keyword !== undefined;
   const hasFuzzy = params.fuzzy !== undefined;
   const hasRegex = params.regex !== undefined;
+  const hasClient = params.client !== undefined;
 
-  if (!hasCount && !hasMinutes && !hasKeyword && !hasFuzzy && !hasRegex) {
+  if (
+    !hasCount &&
+    !hasMinutes &&
+    !hasKeyword &&
+    !hasFuzzy &&
+    !hasRegex &&
+    !hasClient
+  ) {
     console.error("❌ 错误: 至少需要一个查询参数");
     console.log("使用 --help 查看帮助信息");
     process.exit(1);
@@ -135,49 +146,30 @@ function validateParams(params) {
   return params;
 }
 
-// 读取端口号
-function readPort() {
-  let port = DEFAULT_PORT;
-  let portFile;
-
-  // 尝试读取端口文件
-  try {
-    const homeDir = os.homedir();
-    portFile = path.join(homeDir, ".unitylog_port.txt");
-
-    if (fs.existsSync(portFile)) {
-      const portContent = fs.readFileSync(portFile, "utf-8").trim();
-      const parsedPort = parseInt(portContent);
-      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-        port = parsedPort;
-      }
-    }
-  } catch (error) {
-    // 忽略读取错误，使用默认端口
-  }
-
-  return port;
-}
-
 // 构建JSON请求
 function buildRequest(params) {
-  const request = {};
+  const request = { type: "query", data: {} };
 
   if (params.count !== undefined) {
-    request.count = params.count;
-  } else if (params.minutes !== undefined) {
-    request.minutes = params.minutes;
+    request.data.count = params.count;
   }
-
+  if (params.minutes !== undefined) {
+    request.data.minutes = params.minutes;
+  }
   if (params.keyword !== undefined) {
-    request.keyword = params.keyword;
-  } else if (params.fuzzy !== undefined) {
-    request.fuzzy = params.fuzzy;
-  } else if (params.regex !== undefined) {
-    request.regex = params.regex;
+    request.data.keyword = params.keyword;
+  }
+  if (params.fuzzy !== undefined) {
+    request.data.fuzzy = params.fuzzy;
+  }
+  if (params.regex !== undefined) {
+    request.data.regex = params.regex;
+  }
+  if (params.client !== undefined) {
+    request.data.client = params.client;
   }
 
-  return JSON.stringify(request);
+  return JSON.stringify(request) + "\n";
 }
 
 // 发送查询请求
@@ -234,12 +226,13 @@ function formatLogs(response) {
   console.log("=".repeat(80));
 
   logs.forEach((log, index) => {
-    const logType = log.type || "Log";
+    const clientId = log.clientId || "Unknown";
+    const logType = log.logType || "Log";
     const timestamp = log.timestamp || "";
     const message = log.message || "";
-    const stack = log.stack || "";
+    const stack = log.stackTrace || "";
 
-    console.log(`\n[${index + 1}] ${logType} - ${timestamp}`);
+    console.log(`\n[${index + 1}] [${clientId}] ${logType} - ${timestamp}`);
     console.log(`    Message: ${message}`);
 
     if (stack) {
@@ -259,15 +252,14 @@ async function main() {
     const rawParams = parseArgs();
     const params = validateParams(rawParams);
 
-    // 读取端口
-    const port = readPort();
-    console.log(`📡 连接到 UnityLogServer (${HOST}:${port})`);
+    // 使用固定端口
+    console.log(`📡 连接到 UnityLogServer (${HOST}:${PORT})`);
 
     // 构建请求
     const requestJson = buildRequest(params);
 
     // 发送查询
-    const response = await queryLogs(requestJson, port);
+    const response = await queryLogs(requestJson, PORT);
 
     // 格式化输出
     formatLogs(response);

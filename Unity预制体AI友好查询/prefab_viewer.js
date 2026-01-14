@@ -285,6 +285,11 @@ Unity Prefab AI 查看器 - 用于 AI 查看 Unity Prefab 文件
   node prefab_viewer.js example.prefab --root-meta
   node prefab_viewer.js example.prefab --components-of 160547937799403005
   node prefab_viewer.js example.prefab --component 1744541728560894454
+
+建议用法:
+  1. 先用 --tree 查看整体结构，理解 GameObject 的树状层级关系,并获取关注 GameObject 的 fileID
+  2. 再用 --components-of 查看 GameObject 的组件列表，获取关注组件的 fileID
+  3. 最后用 --component 查看组件的详情
 `);
       process.exit(0);
     } else if (arg === "--tree") {
@@ -337,6 +342,11 @@ Unity Prefab AI 查看器 - 用于 AI 查看 Unity Prefab 文件
   node prefab_viewer.js example.prefab --root-meta
   node prefab_viewer.js example.prefab --components-of 160547937799403005
   node prefab_viewer.js example.prefab --component 1744541728560894454
+
+  建议用法:
+  1. 先用 --tree 查看整体结构，理解 GameObject 的树状层级关系,并获取关注的 GameObject 的 fileID
+  2. 再用 --components-of 查看 GameObject 的组件列表，获取关注组件的 fileID
+  3. 最后用 --component 查看组件的详情
 `);
         process.exit(0);
       }
@@ -391,6 +401,11 @@ Unity Prefab AI 查看器 - 用于 AI 查看 Unity Prefab 文件
   node prefab_viewer.js example.prefab --root-meta
   node prefab_viewer.js example.prefab --components-of 160547937799403005
   node prefab_viewer.js example.prefab --component 1744541728560894454
+  
+  建议用法:
+  1. 先用 --tree 查看整体结构，理解 GameObject 的树状层级关系,并获取关注的 GameObject 的 fileID
+  2. 再用 --components-of 查看 GameObject 的组件列表，获取关注组件的 fileID
+  3. 最后用 --component 查看组件的详情
   `);
         process.exit(0);
       }
