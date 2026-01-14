@@ -22,6 +22,7 @@ namespace AssetsTools
         private const int SERVER_PORT = 6800;
         private const int RECONNECT_INTERVAL = 3000; // 重连间隔(毫秒)
         private const int SEND_TIMEOUT = 1000;
+        private const int CONNECT_TIMEOUT = 1000; // 连接超时(毫秒)
 
         private static TcpClient s_Client;
         private static NetworkStream s_Stream;
@@ -29,6 +30,7 @@ namespace AssetsTools
         private static volatile bool s_IsRunning;
         private static volatile bool s_IsConnected;
         private static string s_ClientId; // 服务端分配的客户端ID
+        private static readonly ManualResetEvent s_ShutdownEvent = new ManualResetEvent(false); // 用于快速唤醒线程
         
         private static readonly object s_LockObj = new object();
         
@@ -78,6 +80,7 @@ namespace AssetsTools
             s_IsRunning = true;
             s_IsConnected = false;
             s_ClientId = null;
+            s_ShutdownEvent.Reset(); // 重置关闭信号
 
             // 注册日志回调
             Application.logMessageReceived -= HandleLog; // 先移除防止重复
@@ -162,7 +165,12 @@ namespace AssetsTools
                     }
                 }
 
-                Thread.Sleep(RECONNECT_INTERVAL);
+                // 使用 WaitOne 替代 Thread.Sleep, 可被关闭信号唤醒
+                if (s_ShutdownEvent.WaitOne(RECONNECT_INTERVAL))
+                {
+                    // 收到关闭信号,立即退出
+                    break;
+                }
             }
         }
 
@@ -173,14 +181,29 @@ namespace AssetsTools
         {
             try
             {
+                // 检查是否需要退出
+                if (!s_IsRunning) return;
+                
                 // 关闭旧连接
                 CloseConnection();
 
-                // 创建新连接
+                // 创建新连接 - 使用带超时的连接方式
                 s_Client = new TcpClient();
                 s_Client.SendTimeout = SEND_TIMEOUT;
                 s_Client.ReceiveTimeout = SEND_TIMEOUT;
-                s_Client.Connect(SERVER_HOST, SERVER_PORT);
+                
+                // 使用 BeginConnect + WaitOne 实现可中断的超时连接
+                var result = s_Client.BeginConnect(SERVER_HOST, SERVER_PORT, null, null);
+                bool connected = result.AsyncWaitHandle.WaitOne(CONNECT_TIMEOUT);
+                
+                if (!connected || !s_IsRunning)
+                {
+                    // 超时或需要退出
+                    CloseConnection();
+                    return;
+                }
+                
+                s_Client.EndConnect(result);
                 s_Stream = s_Client.GetStream();
 
                 // 发送注册消息
@@ -433,6 +456,9 @@ namespace AssetsTools
         {
             s_IsRunning = false;
             s_Initialized = false; // 重置初始化标志,允许下次重新初始化
+            
+            // 发送关闭信号,唤醒等待中的线程
+            s_ShutdownEvent.Set();
 
             try
             {
@@ -440,16 +466,24 @@ namespace AssetsTools
                 Application.logMessageReceived -= HandleLog;
                 EditorApplication.update -= CheckConsoleClear;
                 EditorApplication.update -= ProcessMainThreadLogs;
+                
+                // 先关闭连接,这会使阻塞的网络操作立即失败
+                CloseConnection();
 
-                // 等待连接线程结束
+                // 等待连接线程结束 (现在线程能快速响应)
                 if (s_ConnectThread != null && s_ConnectThread.IsAlive)
                 {
-                    s_ConnectThread.Join(500); // 缩短等待时间
+                    // 等待2秒,超时后强制放弃 (线程是后台线程,会随进程退出)
+                    if (!s_ConnectThread.Join(2000))
+                    {
+                        // 超时警告,但不阻塞域重载
+                        if (!silent)
+                        {
+                            Debug.LogWarning("[UnityLogClient] Thread did not exit in time, will be terminated on process exit");
+                        }
+                    }
                     s_ConnectThread = null;
                 }
-
-                // 关闭连接
-                CloseConnection();
 
                 if (!silent)
                 {
