@@ -32,6 +32,9 @@ let logCache = [];
 let unityClientCount = 0;
 const unityClients = new Map(); // clientName(路径) -> {socket, displayName}
 
+// 最近活跃的客户端(最近收到日志的客户端)
+let lastActiveClient = null;
+
 // 日志类型颜色
 const LOG_COLORS = {
   Log: "\x1b[37m", // 白色
@@ -170,6 +173,7 @@ function processQuery(params) {
     count: 0,
     logs: [],
     error: "",
+    activeClient: null, // 实际查询的客户端
   };
 
   // 验证参数
@@ -192,14 +196,19 @@ function processQuery(params) {
   }
 
   // 按客户端筛选
-  if (
+  // 如果未指定client,自动使用最近活跃的客户端
+  const clientFilter =
     params.client !== undefined &&
     params.client !== null &&
     params.client !== ""
-  ) {
+      ? params.client
+      : lastActiveClient;
+
+  if (clientFilter) {
     logs = logs.filter(
-      (log) => log.clientId && log.clientId.includes(params.client)
+      (log) => log.clientPath && log.clientPath.includes(clientFilter)
     );
+    response.activeClient = clientFilter;
   }
 
   // 按数量筛选(最近n条)
@@ -291,9 +300,12 @@ function handleMessage(messageStr, socket, clientInfo) {
             stackTrace: message.data.stackTrace || "",
             logType: message.data.logType || "Log",
             clientId: clientInfo.displayName || "Unknown",
+            clientPath: clientInfo.clientName || "Unknown", // 添加完整路径
           };
           addLogToCache(logEntry);
           printUnityLog(logEntry, clientInfo.displayName);
+          // 更新最近活跃的客户端(使用完整路径)
+          lastActiveClient = clientInfo.clientName;
         }
         break;
 

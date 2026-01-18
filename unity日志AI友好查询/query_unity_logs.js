@@ -24,12 +24,17 @@ UnityLogServer 查询工具
     --fuzzy "<text>"       模糊关键词匹配
     --regex "<pattern>"    正则表达式匹配
     --client "<name>"      按客户端筛选 (模糊匹配,如 "Unity-1" 或 "ProjectName")
+    --stack                显示堆栈信息 (默认不显示,添加此参数才显示)
 
 参数组合规则:
     - count 和 minutes 不能同时使用
     - keyword / fuzzy / regex 不能同时使用
     - 至少需要一个查询参数
-    - 可组合: count/minutes + keyword/fuzzy/regex + client
+    - 可组合: count/minutes + keyword/fuzzy/regex + client + stack
+
+智能筛选:
+    - 如果不指定 --client, 自动返回最近活跃项目的日志
+    - 最近活跃项目 = 最后发送日志的 Unity 客户端
 
 示例:
     node query_unity_logs.js --count 20
@@ -80,6 +85,9 @@ function parseArgs() {
         break;
       case "--client":
         params.client = args[++i];
+        break;
+      case "--stack":
+        params.stack = true;
         break;
       default:
         if (arg.startsWith("--")) {
@@ -213,7 +221,7 @@ function queryLogs(requestJson, port) {
 }
 
 // 格式化输出日志
-function formatLogs(response) {
+function formatLogs(response, showStack) {
   if (!response.success) {
     console.error(`❌ 查询失败: ${response.error || "未知错误"}`);
     return;
@@ -221,21 +229,29 @@ function formatLogs(response) {
 
   const count = response.count || 0;
   const logs = response.logs || [];
+  const activeClient = response.activeClient;
 
+  // 显示实际查询的客户端(完整路径)
+  if (activeClient) {
+    console.log(`📌 Active Client Path: ${activeClient}`);
+  }
   console.log(`✅ Found ${count} log(s)`);
   console.log("=".repeat(80));
 
   logs.forEach((log, index) => {
     const clientId = log.clientId || "Unknown";
+    const clientPath = log.clientPath || "Unknown";
     const logType = log.logType || "Log";
     const timestamp = log.timestamp || "";
     const message = log.message || "";
     const stack = log.stackTrace || "";
 
     console.log(`\n[${index + 1}] [${clientId}] ${logType} - ${timestamp}`);
+    console.log(`    Path: ${clientPath}`);
     console.log(`    Message: ${message}`);
 
-    if (stack) {
+    // 只有指定 --stack 参数时才显示堆栈
+    if (showStack && stack) {
       console.log(`    Stack: ${stack}`);
     }
   });
@@ -262,7 +278,7 @@ async function main() {
     const response = await queryLogs(requestJson, PORT);
 
     // 格式化输出
-    formatLogs(response);
+    formatLogs(response, params.stack);
   } catch (error) {
     console.error(`❌ 错误: ${error.message}`);
     process.exit(1);

@@ -243,23 +243,25 @@ namespace AssetsTools
         }
 
         /// <summary>
-        /// 获取客户端名称(使用项目名)
+        /// 获取客户端名称(使用项目绝对路径)
         /// </summary>
         private static string GetClientName()
         {
             try
             {
-                // 使用项目文件夹名作为客户端名
+                // 使用项目绝对路径作为客户端唯一标识,避免项目名重名问题
                 string projectPath = Application.dataPath;
                 if (projectPath.EndsWith("/Assets"))
                 {
                     projectPath = projectPath.Substring(0, projectPath.Length - 7);
                 }
-                return Path.GetFileName(projectPath);
+                // 转换为绝对路径并规范化路径分隔符
+                projectPath = Path.GetFullPath(projectPath);
+                return projectPath.Replace("\\", "/");
             }
             catch
             {
-                return "UnityProject";
+                return "UnknownProject";
             }
         }
 
@@ -342,7 +344,7 @@ namespace AssetsTools
                 int currentCount = (int)s_LogEntriesGetCountMethod.Invoke(null, null);
 
                 // 检测日志数量骤降(清空操作)
-                if (s_LastConsoleLogCount > 10 && currentCount < s_LastConsoleLogCount / 2 && currentCount < 5)
+                if (s_LastConsoleLogCount > 4 && currentCount < s_LastConsoleLogCount / 2 && currentCount < 4)
                 {
                     // 发送清空消息到服务端
                     SendClearMessage();
