@@ -247,7 +247,6 @@ function formatLogs(response, showStack) {
     const stack = log.stackTrace || "";
 
     console.log(`\n[${index + 1}] [${clientId}] ${logType} - ${timestamp}`);
-    console.log(`    Path: ${clientPath}`);
     console.log(`    Message: ${message}`);
 
     // 只有指定 --stack 参数时才显示堆栈
