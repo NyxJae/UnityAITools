@@ -101,7 +101,7 @@ func showHelp() {
 XLSX 查看器 - 便捷查看和搜索 Excel 文件
 
 用法:
-  xlsx_viewer --path <xlsx文件路径> <操作类型> [参数]
+  ./xlsx_viewer --path <xlsx文件路径> <操作类型> [参数]
 
 必填参数:
   --path <文件路径>    指定 xlsx 文件的绝对路径
@@ -124,12 +124,12 @@ XLSX 查看器 - 便捷查看和搜索 Excel 文件
   行列索引从 1 开始(如第1行、第1列)
 
 示例:
-  xlsx_viewer --path data.xlsx --size
-  xlsx_viewer --path data.xlsx --rows 1 5 --max-cols 20
-  xlsx_viewer --path data.xlsx --rows 10
-  xlsx_viewer --path data.xlsx --cols 1 3 --max-rows 100
-  xlsx_viewer --path data.xlsx --search-col 2 "测试" --mode exact --limit 5
-  xlsx_viewer --path data.xlsx --search-row 1 "error" --mode regex --limit 20
+  ./xlsx_viewer --path data.xlsx --size
+  ./xlsx_viewer --path data.xlsx --rows 1 5 --max-cols 20
+  ./xlsx_viewer --path data.xlsx --rows 10
+  ./xlsx_viewer --path data.xlsx --cols 1 3 --max-rows 100
+  ./xlsx_viewer --path data.xlsx --search-col 2 "测试" --mode exact --limit 5
+  ./xlsx_viewer --path data.xlsx --search-row 1 "error" --mode regex --limit 20
 `)
 	os.Exit(SUCCESS)
 }
