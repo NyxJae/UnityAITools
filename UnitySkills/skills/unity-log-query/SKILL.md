@@ -1,6 +1,6 @@
 ---
 name: unity-log-query
-description: 查询 Unity 编辑器日志.触发关键词:Unity 日志,Unity log,看下日志
+description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity log
 ---
 
 # Unity Log Query
@@ -18,12 +18,11 @@ description: 查询 Unity 编辑器日志.触发关键词:Unity 日志,Unity log
    - 输入目录: `Assets/AgentCommands/pending/`
    - 输出目录: `Assets/AgentCommands/results/`
    - 归档目录: `Assets/AgentCommands/done/`
-注意是Unity项目的 Assets/AgentCommands/ 目录,不一定是根目录
-你不要新建文件夹,而是去找,找不到说明Unity项目没有安装本技能需要的插件,需要提示用户安装
+
 2. 生成命令文件
 
    - 文件名: `{id}.json`,id 建议 16-32 字符,仅 `[a-zA-Z0-9_-]`
-   - 写入 `pending/` 后,一般瞬间完成,可直接去 results 查看结果,而不用等待(比如不用sleep等命令)
+   - 写入 `pending/` 后,一般瞬间完成,可根据 id 推测出结果文件路径,直接去 results 查看结果,而不用等待或检查文件存在性(比如不用`sleep`,`ls`等命令)
 
    示例:
 
@@ -43,13 +42,13 @@ description: 查询 Unity 编辑器日志.触发关键词:Unity 日志,Unity log
    params 说明:
 
    - `n` 必填,返回最近 n 条日志
-   - `level` 可选,Log/Warning/Error/Exception
+   - `level` 可选,Log/Warning/Error
    - `keyword` 可选,关键词
    - `matchMode` 可选,Strict/Fuzzy/Regex
    - `includeStack` 可选,默认 false
 
-3. 读取结果
-
+3. 直接读取结果
+  你可以推测出结果文件路径,可直接尝试读取,一般能直接拿到结果.不用`ls`等命令
    - 结果路径: `results/{id}.json`
    - `status` 可能为 `processing` | `success` | `error`
    - `error.message` 为中文错误提示,可直接展示
@@ -80,7 +79,6 @@ description: 查询 Unity 编辑器日志.触发关键词:Unity 日志,Unity log
 
 ### Notes
 
-- 写入 pending 后插件会先写 processing,再写最终结果,处理中请轮询 results.
 - results 仅保留最近 20 条最终结果(success/error),建议及时读取.
 - 正则非法会返回 error,不会崩溃插件.
 

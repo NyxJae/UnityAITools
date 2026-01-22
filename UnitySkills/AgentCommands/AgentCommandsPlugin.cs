@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using AgentCommands.Core;
 using AgentCommands.Handlers;
-using LitJson2_utf;
+using LitJson2;
 using UnityEditor;
 using UnityEngine;
 
@@ -82,10 +82,11 @@ namespace AgentCommands
         /// </summary>
         static AgentCommandsPlugin()
         {
-            if (Application.isPlaying)
-            {
-                return;
-            }
+            // 运行游戏期间仍要处理命令.
+            // if (Application.isPlaying)
+            // {
+            //     return;
+            // }
 
             Initialize();
         }

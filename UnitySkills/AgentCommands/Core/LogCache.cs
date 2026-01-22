@@ -130,9 +130,7 @@ namespace AgentCommands.Core
                 case LogType.Warning:
                     return "Warning";
                 case LogType.Error:
-                    return "Error";
                 case LogType.Exception:
-                    return "Exception";
                 case LogType.Assert:
                     return "Error";
                 default:

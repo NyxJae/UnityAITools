@@ -45,9 +45,18 @@
 **操作类型参数（必选其一）**：
 
 - `--size`：获取行列数
-- `--rows [x] [y]`：获取第 x 到第 y 行，x 和 y 可选，默认 x=1, y=3
-- `--cols [x] [y]`：获取第 x 到第 y 列，x 和 y 可选，默认 x=1, y=3
-- `--search-col <列索引> <关键词>`：在指定列搜索
+- `--rows <行范围>`：获取指定行，支持多种格式：
+  - 单行：`--rows 5`（获取第 5 行）
+  - 多行：`--rows 1,3,5`（获取第 1, 3, 5 行）
+  - 连续范围：`--rows 1-5`（获取第 1-5 行）
+  - 组合格式：`--rows 1-3,5,7-10`（获取第 1-3 行，第 5 行，第 7-10 行）
+  - 默认：`--rows`（等效于 `--rows 1-3`，获取第 1-3 行）
+- `--cols <列范围>`：获取指定列，支持多种格式：
+  - Excel 列标号（推荐）：`--cols A`（获取第 A 列）、`--cols A,C,E`（获取第 A, C, E 列）、`--cols A-E`（获取第 A-E 列）、`--cols A-C,E,G-J`（组合格式）
+  - 数字索引（兼容）：`--cols 1`（获取第 1 列）、`--cols 1,3,5`（获取第 1, 3, 5 列）、`--cols 1-5`（获取第 1-5 列）、`--cols 1-3,5,7-10`（组合格式）
+  - 默认：`--cols`（等效于 `--cols A-C` 或 `--cols 1-3`，获取第 A-C 列）
+  - **Excel 列标号规则**：A=1, B=2, ..., Z=26, AA=27, AB=28, ..., AZ=52, BA=53, ...
+- `--search-col <列索引> <关键词>`：在指定列搜索，支持 Excel 列标号（A, B, C...）或数字索引（1, 2, 3...）
 - `--search-row <行索引> <关键词>`：在指定行搜索
 
 **可选参数**：
@@ -64,9 +73,47 @@
 
 ### 3.3 输出格式
 
-- 使用 **JSON 格式**输出，便于程序解析
-- 使用 `JSON.stringify(result, null, 2)` 美化输出，便于人类阅读
+- 使用 **CSV 格式**输出，便于人类阅读和查看
+- 第一行为列标号（空白单元格 + A, B, C, D...）
+- 第一列为行号（1, 2, 3, 4...）
+- 数据区域使用逗号分隔，内容包含逗号时用双引号包裹
 - 错误信息输出到 `console.error`，使用 `process.exit(1)` 退出
+
+**CSV 输出格式详解**：
+
+对于获取行数据的操作（`--rows`，`--search-col`），输出格式为：
+
+```
+,A,B,C,D,E,F,... ← 第一行：空白单元格 + Excel 列标号（A, B, C...）
+1,数据1,数据2,数据3,数据4,数据5,数据6,... ← 第一列：行号（1, 2, 3...）
+2,数据1,数据2,数据3,数据4,数据5,数据6,...
+3,数据1,数据2,数据3,数据4,数据5,数据6,...
+...
+```
+
+对于获取列数据的操作（`--cols`，`--search-row`），输出格式为：
+
+```
+,A,B,C ← 第一行：空白单元格 + Excel 列标号（A, B, C）
+1,数据1,数据2,数据3 ← 第一列：行号（1, 2, 3...）
+2,数据1,数据2,数据3
+3,数据1,数据2,数据3
+...
+```
+
+**Excel 列标号规则**：
+
+- 1-26：A, B, C, ..., Z
+- 27-52：AA, AB, AC, ..., AZ
+- 53-78：BA, BB, BC, ..., BZ
+- 以此类推，类似 Excel 的列标号系统
+
+**特殊字符处理**：
+
+- 如果单元格内容包含逗号（,），则用双引号包裹整个单元格内容
+- 如果单元格内容包含双引号（"），则用两个双引号（""）转义
+- 示例：`包含,逗号的内容` → `"包含,逗号的内容"`
+- 示例：`包含"引号"的内容` → `"包含""引号""的内容"`
 
 ### 3.4 数据范围定义
 
@@ -90,16 +137,8 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "size",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "rows": 150,
-    "cols": 20
-  }
-}
+```
+Rows:150,Cols:20
 ```
 
 **说明**：返回文件的实际使用行数和列数，不包括空行空列。
@@ -112,27 +151,14 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "rows",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "rowRange": {
-      "start": 1,
-      "end": 3
-    },
-    "maxCols": 50,
-    "data": [
-      ["ID", "Name", "Description", "Duration", "EffectType", ...],
-      ["1001", "攻击提升", "攻击力提升20%", 10, "attack", ...],
-      ["1002", "防御提升", "防御力提升15%", 10, "defense", ...]
-    ]
-  }
-}
+```
+,A,B,C,D,E,...
+1,ID,Name,Description,Duration,EffectType,...
+2,1001,攻击提升,攻击力提升20%,10,attack,...
+3,1002,防御提升,防御力提升15%,10,defense,...
 ```
 
-**说明**：返回第 1-3 行数据，每行最多 50 列。
+**说明**：返回第 1-3 行数据，每行最多 50 列。第一行为列标号，第一列为行号。
 
 #### 例 3：获取第 1-5 行，每行最多 20 列
 
@@ -146,26 +172,13 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "rows",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "rowRange": {
-      "start": 1,
-      "end": 5
-    },
-    "maxCols": 20,
-    "data": [
-      ["ID", "Name", "Description", ...],
-      ["1001", "攻击提升", "攻击力提升20%", ...],
-      ["1002", "防御提升", "防御力提升15%", ...],
-      ["1003", "速度提升", "速度提升10%", ...],
-      ["1004", "生命提升", "生命值提升30%", ...]
-    ]
-  }
-}
+```
+,A,B,C,D,...
+1,ID,Name,Description,...
+2,1001,攻击提升,攻击力提升20%,...
+3,1002,防御提升,防御力提升15%,...
+4,1003,速度提升,速度提升10%,...
+5,1004,生命提升,生命值提升30%,...
 ```
 
 **说明**：返回第 1-5 行数据，每行最多 20 列。只指定一个参数时，表示从第 1 行到第 n 行。
@@ -178,27 +191,14 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "rows",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "rowRange": {
-      "start": 5,
-      "end": 10
-    },
-    "maxCols": 50,
-    "data": [
-      ["1005", "超级攻击", "攻击力提升50%", ...],
-      ["1006", "超级防御", "防御力提升40%", ...],
-      ["1007", "超级速度", "速度提升30%", ...],
-      ["1008", "超级生命", "生命值提升50%", ...],
-      ["1009", "暴击提升", "暴击率提升15%", ...],
-      ["1010", "闪避提升", "闪避率提升12%", ...]
-    ]
-  }
-}
+```
+,A,B,C,D,...
+5,1005,超级攻击,攻击力提升50%,...
+6,1006,超级防御,防御力提升40%,...
+7,1007,超级速度,速度提升30%,...
+8,1008,超级生命,生命值提升50%,...
+9,1009,暴击提升,暴击率提升15%,...
+10,1010,闪避提升,闪避率提升12%,...
 ```
 
 **说明**：返回第 5-10 行数据，常用于查看中间的数据段。
@@ -213,36 +213,16 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "cols",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "colRange": {
-      "start": 1,
-      "end": 3
-    },
-    "maxRows": 50,
-    "data": [
-      {
-        "colIndex": 1,
-        "values": ["ID", "1001", "1002", "1003", ...]
-      },
-      {
-        "colIndex": 2,
-        "values": ["Name", "攻击提升", "防御提升", "速度提升", ...]
-      },
-      {
-        "colIndex": 3,
-        "values": ["Description", "攻击力提升20%", "防御力提升15%", "速度提升10%", ...]
-      }
-    ]
-  }
-}
+```
+,A,B,C
+1,ID,Name,Description
+2,1001,攻击提升,攻击力提升20%
+3,1002,防御提升,防御力提升15%
+4,1003,速度提升,速度提升10%
+...
 ```
 
-**说明**：返回第 1-3 列数据，每列最多 50 行，数据以列的方式组织。
+**说明**：返回第 1-3 列数据，每列最多 50 行，数据以列的方式组织，转置显示。
 
 #### 例 6：获取第 3-5 列，每列最多 100 行
 
@@ -252,36 +232,125 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "cols",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "colRange": {
-      "start": 3,
-      "end": 5
-    },
-    "maxRows": 100,
-    "data": [
-      {
-        "colIndex": 3,
-        "values": ["Description", "攻击力提升20%", "防御力提升15%", "速度提升10%", ...]
-      },
-      {
-        "colIndex": 4,
-        "values": ["Duration", 10, 10, 10, ...]
-      },
-      {
-        "colIndex": 5,
-        "values": ["EffectType", "attack", "defense", "speed", ...]
-      }
-    ]
-  }
-}
+```
+,C,D,E
+1,Description,Duration,EffectType
+2,攻击力提升20%,10,attack
+3,防御力提升15%,10,defense
+4,速度提升10%,10,speed
+...
 ```
 
-**说明**：返回第 3-5 列数据，每列最多 100 行。
+**说明**：返回第 3-5 列数据，每列最多 100 行，转置显示。
+
+#### 例 6a：使用 Excel 列标号获取第 A 列
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --cols A
+```
+
+**期望输出**：
+
+```
+,A
+1,ID
+2,1001
+3,1002
+4,1003
+...
+```
+
+**说明**：返回第 A 列数据，支持使用 Excel 列标号。
+
+#### 例 6b：使用 Excel 列标号获取第 A, C, E 列
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --cols A,C,E
+```
+
+**期望输出**：
+
+```
+,A,C,E
+1,ID,Description,EffectType
+2,1001,攻击力提升20%,attack
+3,1002,防御力提升15%,defense
+4,1003,速度提升10%,speed
+...
+```
+
+**说明**：支持使用逗号分隔多个 Excel 列标号。
+
+#### 例 6c：使用 Excel 列标号获取第 A-C 列
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --cols A-C
+```
+
+**期望输出**：
+
+```
+,A,B,C
+1,ID,Name,Description
+2,1001,攻击提升,攻击力提升20%
+3,1002,防御提升,防御力提升15%
+4,1003,速度提升,速度提升10%
+...
+```
+
+**说明**：支持使用连字符（-）表示连续范围。
+
+#### 例 6d：使用 Excel 列标号的组合格式
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --cols A-C,E,G-J
+```
+
+**期望输出**：
+
+```
+,A,B,C,E,G,H,I,J
+1,ID,Name,Description,EffectType,...,...,...,...
+2,1001,攻击提升,攻击力提升20%,attack,...,...,...,...
+3,1002,防御提升,防御力提升15%,defense,...,...,...,...
+...
+```
+
+**说明**：支持组合格式，可以混合使用连续范围和单独的列。
+
+#### 例 6e：获取第 2, 4, 6 行（多行指定）
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --rows 2,4,6
+```
+
+**期望输出**：
+
+```
+,A,B,C,D,E
+2,1001,攻击提升,攻击力提升20%,10,attack
+4,1003,速度提升,速度提升10%,10,speed
+6,1005,超级攻击,攻击力提升50%,20,attack
+```
+
+**说明**：支持使用逗号分隔多个行号。
+
+#### 例 6f：获取第 2, 4, 6 行，使用 Excel 列标号限制列
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --rows 2,4,6 --max-cols 3
+```
+
+**期望输出**：
+
+```
+,A,B,C
+2,1001,攻击提升,攻击力提升20%
+4,1003,速度提升,速度提升10%
+6,1005,超级攻击,攻击力提升50%
+```
+
+**说明**：`--max-cols` 限制每行最多返回的列数（前 3 列）。
 
 ### 4.2 搜索功能示例
 
@@ -293,25 +362,11 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-col",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "colIndex": 2,
-    "keyword": "攻击",
-    "mode": "fuzzy",
-    "limit": 10
-  },
-  "result": {
-    "matches": 2,
-    "data": [
-      ["1001", "攻击提升", "攻击力提升20%", 10, "attack", ...],
-      ["1005", "超级攻击", "攻击力提升50%", 20, "attack", ...]
-    ]
-  }
-}
+```
+搜索结果: 找到 2 个匹配
+,A,B,C,D,E,...
+2,1001,攻击提升,攻击力提升20%,10,attack,...
+6,1005,超级攻击,攻击力提升50%,20,attack,...
 ```
 
 **说明**：返回第 2 列中包含"攻击"的所有行，最多返回 10 条，每行返回完整数据。
@@ -324,24 +379,10 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-col",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "colIndex": 2,
-    "keyword": "攻击提升",
-    "mode": "exact",
-    "limit": 5
-  },
-  "result": {
-    "matches": 1,
-    "data": [
-      ["1001", "攻击提升", "攻击力提升20%", 10, "attack", ...]
-    ]
-  }
-}
+```
+搜索结果: 找到 1 个匹配
+,A,B,C,D,E,...
+2,1001,攻击提升,攻击力提升20%,10,attack,...
 ```
 
 #### 例 9：在第 2 列使用正则表达式搜索
@@ -352,25 +393,11 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-col",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "colIndex": 2,
-    "keyword": "攻击.*%",
-    "mode": "regex",
-    "limit": 10
-  },
-  "result": {
-    "matches": 2,
-    "data": [
-      ["1001", "攻击提升", "攻击力提升20%", 10, "attack", ...],
-      ["1005", "超级攻击", "攻击力提升50%", 20, "attack", ...]
-    ]
-  }
-}
+```
+搜索结果: 找到 2 个匹配
+,A,B,C,D,E,...
+2,1001,攻击提升,攻击力提升20%,10,attack,...
+6,1005,超级攻击,攻击力提升50%,20,attack,...
 ```
 
 #### 例 10：在第 1 行搜索关键词"ID"
@@ -381,27 +408,10 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-row",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "rowIndex": 1,
-    "keyword": "ID",
-    "mode": "fuzzy",
-    "limit": 10
-  },
-  "result": {
-    "matches": 1,
-    "data": [
-      {
-        "colIndex": 1,
-        "value": "ID"
-      }
-    ]
-  }
-}
+```
+搜索结果: 找到 1 个匹配
+,A
+1,ID
 ```
 
 **说明**：返回第 1 行中包含"ID"的所有列，最多返回 10 条，每列返回完整数据。
@@ -414,40 +424,46 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-row",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "rowIndex": 3,
-    "keyword": "%",
-    "mode": "fuzzy",
-    "limit": 20
-  },
-  "result": {
-    "matches": 3,
-    "data": [
-      {
-        "colIndex": 3,
-        "value": "攻击力提升20%"
-      },
-      {
-        "colIndex": 4,
-        "value": "防御力提升15%"
-      },
-      {
-        "colIndex": 5,
-        "value": "速度提升10%"
-      }
-    ]
-  }
-}
+```
+搜索结果: 找到 3 个匹配
+,C,D,E
+3,攻击力提升20%,防御力提升15%,速度提升10%
+```
+
+#### 例 12：使用 Excel 列标号在第 B 列搜索"攻击"
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col B "攻击"
+```
+
+**期望输出**：
+
+```
+搜索结果: 找到 2 个匹配
+,A,B,C,D,E
+2,1001,攻击提升,攻击力提升20%,10,attack
+6,1005,超级攻击,攻击力提升50%,20,attack
+```
+
+**说明**：支持使用 Excel 列标号进行列搜索。
+
+#### 例 13：使用 Excel 列标号在第 B 列精确搜索"攻击提升"
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col B "攻击提升" --mode exact
+```
+
+**期望输出**：
+
+```
+搜索结果: 找到 1 个匹配
+,A,B,C,D,E
+2,1001,攻击提升,攻击力提升20%,10,attack
 ```
 
 ### 4.3 边缘情况处理
 
-#### 例 12：文件不存在
+#### 例 14：文件不存在
 
 ```bash
 xlsx_viewer --path F:/不存在的文件.xlsx --size
@@ -461,7 +477,7 @@ xlsx_viewer --path F:/不存在的文件.xlsx --size
 
 **退出码**：1
 
-#### 例 13：未指定操作类型
+#### 例 15：未指定操作类型
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx
@@ -477,7 +493,7 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **退出码**：2
 
-#### 例 14：未指定文件路径
+#### 例 16：未指定文件路径
 
 ```bash
 xlsx_viewer --size
@@ -493,7 +509,7 @@ xlsx_viewer --size
 
 **退出码**：2
 
-#### 例 15：指定了多个操作类型（互斥）
+#### 例 17：指定了多个操作类型（互斥）
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --size --rows
@@ -507,7 +523,7 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **退出码**：2
 
-#### 例 16：搜索时缺少关键词
+#### 例 18：搜索时缺少关键词
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col 2
@@ -523,7 +539,7 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **退出码**：2
 
-#### 例 17：列索引超出范围
+#### 例 19：列索引超出范围
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col 999 "测试"
@@ -531,28 +547,29 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-col",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "colIndex": 999,
-    "keyword": "测试",
-    "mode": "fuzzy",
-    "limit": 10
-  },
-  "result": {
-    "matches": 0,
-    "data": [],
-    "warning": "列索引 999 超出范围，文件只有 20 列"
-  }
-}
+```
+警告: 列索引 999 超出范围，文件只有 20 列
+搜索结果: 找到 0 个匹配
 ```
 
 **说明**：不会报错，返回空结果并给出警告信息。
 
-#### 例 18：正则表达式语法错误
+#### 例 20：Excel 列标号超出范围
+
+```bash
+xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col ZZ "测试"
+```
+
+**期望输出**：
+
+```
+警告: 列标号 ZZ 超出范围，文件只有 20 列（T 列）
+搜索结果: 找到 0 个匹配
+```
+
+**说明**：使用 Excel 列标号时，如果超出范围，给出友好的提示。
+
+#### 例 21：正则表达式语法错误
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col 2 "[无效正则" --mode regex
@@ -566,7 +583,7 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **退出码**：1
 
-#### 例 19：搜索无结果
+#### 例 22：搜索无结果
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --search-col 2 "不存在的关键词"
@@ -574,25 +591,11 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "search-col",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "searchParams": {
-    "colIndex": 2,
-    "keyword": "不存在的关键词",
-    "mode": "fuzzy",
-    "limit": 10
-  },
-  "result": {
-    "matches": 0,
-    "data": []
-  }
-}
+```
+搜索结果: 找到 0 个匹配
 ```
 
-#### 例 20：请求行数超过文件实际行数
+#### 例 23：请求行数超过文件实际行数
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx --rows 1000
@@ -600,25 +603,15 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "rows",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/mydb_buff_tbl.xlsx",
-  "result": {
-    "rowCount": 150,
-    "maxCols": 50,
-    "data": [
-      /* 所有150行数据 */
-    ],
-    "warning": "请求1000行，但文件只有150行"
-  }
-}
 ```
+警告: 请求1000行，但文件只有150行
+```
+
+（随后是所有 150 行数据的 CSV 格式输出，第一行为列标号，第一列为行号）
 
 **说明**：返回所有可用数据，不报错，给出警告信息。
 
-#### 例 21：空文件或只有表头
+#### 例 24：空文件或只有表头
 
 ```bash
 xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/空文件.xlsx --size
@@ -626,19 +619,11 @@ xlsx_viewer --path F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/空文件
 
 **期望输出**：
 
-```json
-{
-  "success": true,
-  "operation": "size",
-  "filePath": "F:/UnityProject/RXJH/RXJH_307_mini/Client/数据库/空文件.xlsx",
-  "result": {
-    "rows": 0,
-    "cols": 0
-  }
-}
+```
+Rows:0,Cols:0
 ```
 
-#### 例 20：显示帮助信息
+#### 例 25：显示帮助信息
 
 ```bash
 xlsx_viewer --help
@@ -688,7 +673,7 @@ XLSX 查看器 - 便捷查看和搜索 Excel 文件
 **开发依赖**：
 
 - Go 1.16 或更高版本
-- `github.com/360EntSecGroup-Skylar/excelize/v2` 库（或类似 Go 的 xlsx 处理库）
+- `github.com/xuri/excelize/v2` 库（或类似 Go 的 xlsx 处理库）
 
 **编译命令**：
 
@@ -708,7 +693,6 @@ GOOS=darwin GOARCH=amd64 go build -o xlsx_viewer
 - 编译后得到单个可执行文件（xlsx_viewer 或 xlsx_viewer.exe）
 - 无需安装任何依赖或运行时环境
 - 可直接复制到任何目录独立使用
-- 可以放入 PATH 环境变量目录，方便全局调用
 
 ## 6. 技术实现要点
 
@@ -718,8 +702,9 @@ GOOS=darwin GOARCH=amd64 go build -o xlsx_viewer
 4. **XLSX 读取**：使用 excelize 库读取文件，获取第一个 sheet
 5. **行列统计**：使用 `xlsx.GetSheetName()` 和 `xlsx.GetRows()` 获取实际使用的行列范围
 6. **搜索逻辑**：支持三种搜索模式（模糊、精确、正则），使用 Go 的 `strings` 和 `regexp` 包
-7. **输出格式**：使用 `encoding/json` 包，`json.MarshalIndent()` 美化输出
+7. **输出格式**：使用 CSV 格式输出，第一行为列标号（空白 + A, B, C...），第一列为行号（1, 2, 3...），内容包含逗号时用双引号包裹
 8. **索引处理**：内部使用 0-based 索引，对外展示为 1-based 索引
+9. **列标号转换**：实现数字索引到 Excel 列标的转换函数（如 1->A, 2->B, 27->AA）
 
 ## 7. 测试要求
 
