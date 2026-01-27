@@ -20,6 +20,11 @@ namespace AgentCommands
         internal const int MaxResults = 20;
 
         /// <summary>
+        /// 默认批次级别超时(毫秒).
+        /// </summary>
+        internal const int DefaultBatchTimeoutMs = 30000;
+
+        /// <summary>
         /// 读取pending文件失败时的重试间隔(毫秒).
         /// </summary>
         internal static readonly int[] ReadRetryDelaysMs = { 1000, 2000, 4000 };

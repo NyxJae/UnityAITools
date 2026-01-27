@@ -33,7 +33,7 @@ namespace AgentCommands.Handlers
 
             if (!string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(matchMode))
             {
-                matchMode = "Strict";
+                matchMode = "Fuzzy";
             }
 
             if (matchMode == "Regex" && !string.IsNullOrEmpty(keyword))

@@ -4,5 +4,8 @@
 中文提交信息和 pr 信息
 
 # 当前任务
-xlsx_viewer/xlsx_viewer_tool_requirement.md
+requirements/AgentCommands/02_1_日志功能批量查询.md
 根据需求文档开发
+
+完成后UnitySkills/skills/unity-log-query/SKILL.md 也需要更新
+保持 SKILL.md 简洁,不得冗杂

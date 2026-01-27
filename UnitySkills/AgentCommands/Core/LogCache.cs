@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
-using AgentCommands;
 
 namespace AgentCommands.Core
 {
@@ -151,34 +150,34 @@ namespace AgentCommands.Core
         {
             if (n < 0) n = 0;
 
+            IEnumerable<LogEntry> seq;
+
             lock (_lock)
             {
-                IEnumerable<LogEntry> seq = _logs;
+                seq = _logs;
 
                 if (!string.IsNullOrEmpty(level))
                 {
                     seq = FilterByLevel(seq, level);
                 }
-
                 if (!string.IsNullOrEmpty(keyword))
                 {
-                    seq = FilterByKeyword(seq, keyword, matchMode ?? "Strict", includeStack);
+                    seq = FilterByKeyword(seq, keyword, matchMode ?? "Fuzzy", includeStack);
                 }
-
-                List<LogEntry> filtered = new List<LogEntry>();
-                foreach (var item in seq)
-                {
-                    filtered.Add(item);
-                }
-
-                // 返回最近 n 条,并保持旧->新顺序.
-                if (n > 0 && filtered.Count > n)
-                {
-                    filtered.RemoveRange(0, filtered.Count - n);
-                }
-
-                return filtered;
             }
+            List<LogEntry> filtered = new List<LogEntry>();
+            foreach (var item in seq)
+            {
+                filtered.Add(item);
+            }
+
+            // 返回最近 n 条,并保持旧->新顺序.
+            if (n > 0 && filtered.Count > n)
+            {
+                filtered.RemoveRange(0, filtered.Count - n);
+            }
+
+            return filtered;
         }
 
         /// <summary>
@@ -239,14 +238,8 @@ namespace AgentCommands.Core
                 yield break;
             }
 
-            // 严格匹配(默认).
-            foreach (var e in seq)
-            {
-                if ((e.message != null && e.message.Contains(keyword)) || (includeStack && e.stack != null && e.stack.Contains(keyword)))
-                {
-                    yield return e;
-                }
-            }
+            // 未知匹配模式，不返回任何结果
+            foreach (var e in seq) yield break;
         }
 
         /// <summary>

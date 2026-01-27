@@ -1,12 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using AgentCommands.Core;
-using AgentCommands.Handlers;
-using LitJson2;
 using UnityEditor;
-using UnityEngine;
 
 namespace AgentCommands
 {
@@ -331,7 +327,7 @@ namespace AgentCommands
         }
 
         /// <summary>
-        /// 读取并处理单个pending命令文件.
+        /// 读取并处理pending命令文件(仅支持批量命令格式).
         /// </summary>
         /// <param name="item">队列项.</param>
         private static void ProcessPendingFile(PendingFileItem item)
@@ -342,65 +338,45 @@ namespace AgentCommands
             {
                 EnsureDirectories();
 
-                PendingCommand cmd;
-                try
-                {
-                    cmd = ReadPendingCommand(item);
-                }
-                catch (Exception ex)
-                {
-                    if (ShouldRetryRead(item))
-                    {
-                        Reschedule(item);
-                        return;
-                    }
-
-                    WriteErrorAndArchive(item.id, null, null, AgentCommandErrorCodes.InvalidJson, "命令文件不是合法的 json,请检查写入是否完整", "异常详情: " + ex.Message);
-                    return;
-                }
-
-                if (cmd == null || string.IsNullOrEmpty(cmd.type) || cmd.@params == null)
-                {
-                    WriteErrorAndArchive(item.id, cmd != null ? cmd.type : null, null, AgentCommandErrorCodes.InvalidFields, "命令文件缺少必要字段 type 或 params", null);
-                    return;
-                }
-
-                string startedAt = AgentCommandsConfig.FormatTimestamp(DateTime.Now);
-                WriteProcessing(item.id, cmd.type, startedAt);
-
-                try
-                {
-                    JsonData resultData = ExecuteCommand(cmd);
-                    WriteSuccessAndArchive(item.id, cmd.type, startedAt, resultData);
-                }
-                catch (Exception ex)
-                {
-                    string code;
-                    string message;
-
-                    if (ex is InvalidOperationException && ex.Message != null && ex.Message.StartsWith(AgentCommandErrorCodes.InvalidRegex + ":"))
-                    {
-                        code = AgentCommandErrorCodes.InvalidRegex;
-                        message = "正则表达式非法,请检查 keyword";
-                    }
-                    else if (ex is NotSupportedException)
-                    {
-                        code = AgentCommandErrorCodes.UnknownType;
-                        message = "未知命令类型: " + cmd.type;
-                    }
-                    else
-                    {
-                        code = AgentCommandErrorCodes.RuntimeError;
-                        message = "命令执行发生异常";
-                    }
-
-                    WriteErrorAndArchive(item.id, cmd.type, startedAt, code, message, "异常详情: " + ex.Message);
-                }
+                ProcessBatchCommand(item);
             }
             finally
             {
                 _isProcessing = false;
             }
+        }
+
+        /// <summary>
+        /// 处理批量命令.
+        /// </summary>
+        /// <param name="item">队列项.</param>
+        private static void ProcessBatchCommand(PendingFileItem item)
+        {
+            BatchPendingCommand batchCmd;
+            try
+            {
+                batchCmd = BatchCommandParser.ParseAndValidate(item.fullPath, item.fileTime);
+            }
+            catch (Exception ex)
+            {
+                // 仅对JSON解析失败等暂时性错误触发重试
+                if (ex is ArgumentException && ShouldRetryRead(item))
+                {
+                    Reschedule(item);
+                    return;
+                }
+
+                string[] parts = ex.Message.Split(new[] { ": " }, 2, StringSplitOptions.None);
+                string code = parts[0];
+                string message = ex.Message;
+                string detail = parts.Length > 1 ? parts[1] : "";
+
+                WriteBatchErrorAndArchive(item.id, null, null, code, message, detail);
+                return;
+            }
+
+            // 开始执行批次
+            ProcessBatchCommands(batchCmd, item);
         }
 
         /// <summary>
@@ -433,262 +409,43 @@ namespace AgentCommands
             _isProcessing = false;
         }
 
+
+
         /// <summary>
-        /// 读取pending命令并解析为结构体.
+        /// 执行批量命令,支持超时控制和部分成功模式.
         /// </summary>
+        /// <param name="batchCmd">批量命令对象.</param>
         /// <param name="item">队列项.</param>
-        /// <returns>解析后的命令对象.</returns>
-        private static PendingCommand ReadPendingCommand(PendingFileItem item)
+        private static void ProcessBatchCommands(BatchPendingCommand batchCmd, PendingFileItem item)
         {
-            string json = File.ReadAllText(item.fullPath);
-            JsonData root = JsonMapper.ToObject(json);
-
-            string type = null;
-            JsonData p = null;
-
-            if (root != null && root.IsObject)
+            // 使用BatchCommandExecutor执行批量命令
+            BatchResult batchResult = BatchCommandExecutor.Execute(batchCmd, result =>
             {
-                if (root.ContainsKey("type")) type = root["type"].ToString();
-                if (root.ContainsKey("params")) p = root["params"];
-            }
+                // processing状态更新回调
+                BatchResultWriter.WriteProcessing(result);
+            });
 
-            return new PendingCommand
-            {
-                id = item.id,
-                type = type,
-                @params = p,
-                fileTime = item.fileTime
-            };
+            // 批次完成,写入最终结果并归档
+            BatchResultWriter.WriteSuccessAndArchive(batchResult, item.fullPath);
         }
 
-        /// <summary>
-        /// 根据命令类型分发执行.
-        /// </summary>
-        /// <param name="cmd">解析后的命令.</param>
-        /// <returns>命令结果数据.</returns>
-        private static JsonData ExecuteCommand(PendingCommand cmd)
-        {
-            if (cmd.type == LogQueryCommandHandler.CommandType)
-            {
-                return LogQueryCommandHandler.Execute(cmd.@params);
-            }
 
-            throw new NotSupportedException(AgentCommandErrorCodes.UnknownType + ": " + cmd.type);
-        }
+
+
 
         /// <summary>
-        /// 写入processing状态的结果文件.
+        /// 写入批量命令错误结果并归档.
         /// </summary>
-        /// <param name="id">命令id.</param>
-        /// <param name="type">命令类型.</param>
-        /// <param name="startedAt">开始时间.</param>
-        private static void WriteProcessing(string id, string type, string startedAt)
-        {
-            CommandResult result = new CommandResult
-            {
-                id = id,
-                type = type,
-                status = AgentCommandStatuses.Processing,
-                startedAt = startedAt,
-            };
-
-            WriteResultAtomically(id, result);
-        }
-
-        /// <summary>
-        /// 写入成功结果并归档命令文件.
-        /// </summary>
-        /// <param name="id">命令id.</param>
-        /// <param name="type">命令类型.</param>
-        /// <param name="startedAt">开始时间.</param>
-        /// <param name="resultData">结果数据.</param>
-        private static void WriteSuccessAndArchive(string id, string type, string startedAt, JsonData resultData)
-        {
-            CommandResult result = new CommandResult
-            {
-                id = id,
-                type = type,
-                status = AgentCommandStatuses.Success,
-                startedAt = startedAt,
-                finishedAt = AgentCommandsConfig.FormatTimestamp(DateTime.Now),
-                result = resultData
-            };
-
-            WriteResultAtomically(id, result);
-            CleanupOldFinalResults();
-            ArchivePending(id);
-        }
-
-        /// <summary>
-        /// 写入错误结果并归档命令文件.
-        /// </summary>
-        /// <param name="id">命令id.</param>
-        /// <param name="type">命令类型.</param>
+        /// <param name="id">批次id.</param>
+        /// <param name="batchId">批次标识.</param>
         /// <param name="startedAt">开始时间.</param>
         /// <param name="code">错误码.</param>
         /// <param name="message">错误消息.</param>
         /// <param name="detail">错误详情.</param>
-        private static void WriteErrorAndArchive(string id, string type, string startedAt, string code, string message, string detail)
+        private static void WriteBatchErrorAndArchive(string id, string batchId, string startedAt, string code, string message, string detail)
         {
-            string started = startedAt;
-            if (string.IsNullOrEmpty(started))
-            {
-                started = AgentCommandsConfig.FormatTimestamp(DateTime.Now);
-            }
-
-            CommandResult result = new CommandResult
-            {
-                id = id,
-                type = type ?? "",
-                status = AgentCommandStatuses.Error,
-                startedAt = started,
-                finishedAt = AgentCommandsConfig.FormatTimestamp(DateTime.Now),
-                error = new CommandError
-                {
-                    code = code,
-                    message = message,
-                    detail = detail
-                }
-            };
-
-            WriteResultAtomically(id, result);
-            CleanupOldFinalResults();
-            ArchivePending(id);
+            string pendingPath = string.IsNullOrEmpty(id) ? null : Path.Combine(AgentCommandsConfig.PendingDirAbsolutePath, id + ".json");
+            BatchResultWriter.WriteErrorAndArchive(batchId, pendingPath, startedAt, code, message, detail);
         }
-
-        /// <summary>
-        /// 原子写入results文件.
-        /// </summary>
-        /// <param name="id">命令id.</param>
-        /// <param name="result">结果对象.</param>
-        private static void WriteResultAtomically(string id, CommandResult result)
-        {
-            string destPath = Path.Combine(AgentCommandsConfig.ResultsDirAbsolutePath, id + ".json");
-            string tmpPath = destPath + ".tmp";
-
-            StringBuilder sb = new StringBuilder();
-            JsonWriter writer = new JsonWriter(new StringWriter(sb));
-            writer.EscapeUnicode = false;
-            JsonMapper.ToJson(result.ToJsonData(), writer);
-            string json = sb.ToString();
-            File.WriteAllText(tmpPath, json);
-
-            try
-            {
-                if (File.Exists(destPath))
-                {
-                    // 优先使用 Replace,避免短暂的结果文件缺失.
-                    string backupPath = destPath + ".bak";
-                    if (File.Exists(backupPath)) File.Delete(backupPath);
-                    File.Replace(tmpPath, destPath, backupPath);
-                    if (File.Exists(backupPath)) File.Delete(backupPath);
-                }
-                else
-                {
-                    File.Move(tmpPath, destPath);
-                }
-            }
-            catch
-            {
-                // 兜底处理.
-                if (File.Exists(destPath)) File.Delete(destPath);
-                if (File.Exists(tmpPath)) File.Move(tmpPath, destPath);
-            }
-
-            if (File.Exists(tmpPath)) File.Delete(tmpPath);
-            string backupLeft = destPath + ".bak";
-            if (File.Exists(backupLeft)) File.Delete(backupLeft);
-        }
-
-        /// <summary>
-        /// 将pending命令文件移动到done目录.
-        /// </summary>
-        /// <param name="id">命令id.</param>
-        private static void ArchivePending(string id)
-        {
-            string pendingPath = Path.Combine(AgentCommandsConfig.PendingDirAbsolutePath, id + ".json");
-            if (!File.Exists(pendingPath)) return;
-
-            string donePath = Path.Combine(AgentCommandsConfig.DoneDirAbsolutePath, id + ".json");
-
-            if (File.Exists(donePath)) File.Delete(donePath);
-            File.Move(pendingPath, donePath);
-        }
-
-        /// <summary>
-        /// 清理多余的最终结果文件.
-        /// </summary>
-        private static void CleanupOldFinalResults()
-        {
-            if (!Directory.Exists(AgentCommandsConfig.ResultsDirAbsolutePath)) return;
-
-            string[] files = Directory.GetFiles(AgentCommandsConfig.ResultsDirAbsolutePath, "*.json", SearchOption.TopDirectoryOnly);
-            List<string> finals = new List<string>();
-
-            foreach (var f in files)
-            {
-                try
-                {
-                    string text = File.ReadAllText(f);
-                    if (string.IsNullOrEmpty(text)) continue;
-
-                    // 先做轻量判断,避免不必要的解析.
-                    if (text.Contains("\"status\":\"processing\""))
-                    {
-                        continue;
-                    }
-
-                    JsonData jd = JsonMapper.ToObject(text);
-                    if (jd != null && jd.IsObject && jd.ContainsKey("status"))
-                    {
-                        string status = jd["status"].ToString();
-                        if (status == AgentCommandStatuses.Success || status == AgentCommandStatuses.Error)
-                        {
-                            finals.Add(f);
-                        }
-                    }
-                }
-                catch
-                {
-                    // 忽略解析失败的结果文件.
-                }
-            }
-
-            if (finals.Count <= AgentCommandsConfig.MaxResults) return;
-
-            finals.Sort((a, b) =>
-            {
-                DateTime ta = GetFileTimeForSort(a);
-                DateTime tb = GetFileTimeForSort(b);
-                int cmp = ta.CompareTo(tb);
-                if (cmp != 0) return cmp;
-                return string.Compare(Path.GetFileName(a), Path.GetFileName(b), StringComparison.Ordinal);
-            });
-
-            int toDelete = finals.Count - AgentCommandsConfig.MaxResults;
-            for (int i = 0; i < toDelete; i++)
-            {
-                string resultPath = finals[i];
-                try
-                {
-                    File.Delete(resultPath);
-                }
-                catch
-                {
-                    // 忽略删除失败的文件.
-                }
-
-                string id = Path.GetFileNameWithoutExtension(resultPath);
-                string donePath = Path.Combine(AgentCommandsConfig.DoneDirAbsolutePath, id + ".json");
-                try
-                {
-                    if (File.Exists(donePath)) File.Delete(donePath);
-                }
-                catch
-                {
-                    // 忽略删除失败的归档文件.
-                }
-            }
-        }
-    }
+}
 }
