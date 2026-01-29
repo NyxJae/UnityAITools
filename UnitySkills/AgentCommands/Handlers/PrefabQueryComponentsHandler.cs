@@ -28,7 +28,7 @@ namespace AgentCommands.Handlers
 
             string prefabPath = parameters.GetString("prefabPath", null);
             string objectPath = parameters.GetString("objectPath", null);
-            
+
             // 参数验证
             if (string.IsNullOrEmpty(prefabPath))
             {
@@ -55,16 +55,31 @@ namespace AgentCommands.Handlers
 
             // 获取组件过滤参数
             string[] componentFilter = null;
-            if (parameters.Has("componentFilter") && parameters.GetData()["componentFilter"].IsArray)
+            try
             {
-                JsonData filterArray = parameters.GetData()["componentFilter"];
-                componentFilter = new string[filterArray.Count];
-                for (int i = 0; i < filterArray.Count; i++)
+                if (parameters.Has("componentFilter"))
                 {
-                    componentFilter[i] = filterArray[i].ToString();
+                    JsonData componentFilterData = parameters.GetData()["componentFilter"];
+                    // 检查是否为 null
+                    if (componentFilterData == null)
+                    {
+                        componentFilter = null;
+                    }
+                    else if (componentFilterData.IsArray)
+                    {
+                        JsonData filterArray = componentFilterData;
+                        componentFilter = new string[filterArray.Count];
+                        for (int i = 0; i < filterArray.Count; i++)
+                        {
+                            componentFilter[i] = filterArray[i].ToString();
+                        }
+                    }
                 }
             }
-
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[PrefabQueryComponentsHandler] Error getting componentFilter: {ex.Message}\n{ex.StackTrace}");
+            }
             bool includeBuiltin = parameters.GetBool("includeBuiltin", false);
             bool includePrivateFields = parameters.GetBool("includePrivateFields", false);
 

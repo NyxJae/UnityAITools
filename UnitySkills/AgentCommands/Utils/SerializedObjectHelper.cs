@@ -32,7 +32,6 @@ namespace AgentCommands.Utils
 
             JsonData result = new JsonData();
             result.SetJsonType(JsonType.Object);
-
             using (SerializedObject serializedObj = new SerializedObject(obj))
             {
                 SerializedProperty prop = serializedObj.GetIterator();
@@ -47,30 +46,47 @@ namespace AgentCommands.Utils
                 // 跳过根属性, 使用Next()以包含[HideInInspector]字段
                 if (prop.Next(true))
                 {
+                    int propIndex = 0;
                     do
                     {
-                        // 跳过脚本字段
-                        if (prop.propertyPath == "m_Script")
+                        try
                         {
-                            continue;
-                        }
+                            propIndex++;
 
-                        // 过滤私有字段
-                        if (!includePrivate && fieldMap != null)
-                        {
-                            string baseFieldName = SerializedFieldFilter.ExtractBaseFieldName(prop.propertyPath);
-                            if (fieldMap.TryGetValue(baseFieldName, out System.Reflection.FieldInfo field) && 
-                                field.IsPrivate)
+                            // 跳过脚本字段
+                            if (prop.propertyPath == "m_Script")
                             {
                                 continue;
                             }
-                        }
 
-                        JsonData value = SerializedPropertyConverter.ConvertSerializedProperty(prop);
-                        SerializedJsonTreeBuilder.InsertPropertyValue(
-                            result, 
-                            PropertyPathParser.ParsePropertyPath(prop.propertyPath), 
-                            value);
+                            // 过滤私有字段
+                            if (!includePrivate && fieldMap != null)
+                            {
+                                string baseFieldName = SerializedFieldFilter.ExtractBaseFieldName(prop.propertyPath);
+                                if (fieldMap.TryGetValue(baseFieldName, out System.Reflection.FieldInfo field) && 
+                                    field.IsPrivate)
+                                {
+                                    continue;
+                                }
+                            }
+
+                            JsonData value = SerializedPropertyConverter.ConvertSerializedProperty(prop);
+                            SerializedJsonTreeBuilder.InsertPropertyValue(
+                                result, 
+                                PropertyPathParser.ParsePropertyPath(prop.propertyPath), 
+                                value);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            string propertyPathStr = "unknown";
+                            try
+                            {
+                                propertyPathStr = prop.propertyPath;
+                            }
+                            catch { }
+
+                            Debug.LogError($"[SerializedObjectHelper] Error processing property {propIndex}: {ex.Message}\nPropertyPath: {propertyPathStr}\nStack: {ex.StackTrace}");
+                        }
                     }
                     while (prop.Next(false));
                 }

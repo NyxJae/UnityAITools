@@ -84,6 +84,7 @@ namespace AgentCommands.Utils
             List<ComponentInfo> result = new List<ComponentInfo>();
             if (gameObject == null)
             {
+                Debug.LogWarning("[ComponentPropertyReader] GameObject is null");
                 return result;
             }
 
@@ -91,55 +92,62 @@ namespace AgentCommands.Utils
 
             foreach (Component comp in components)
             {
-                // 检查是否为内置组件
-                if (!includeBuiltin && IsBuiltinComponent(comp))
+                try
                 {
-                    continue;
-                }
-
-                // 检查类型过滤
-                if (componentFilter != null && componentFilter.Length > 0)
-                {
-                    string typeName = comp.GetType().Name;
-                    bool matched = false;
-                    foreach (string filter in componentFilter)
-                    {
-                        if (typeName.Equals(filter, StringComparison.OrdinalIgnoreCase))
-                        {
-                            matched = true;
-                            break;
-                        }
-                    }
-                    if (!matched)
+                    // 检查是否为内置组件
+                    if (!includeBuiltin && IsBuiltinComponent(comp))
                     {
                         continue;
                     }
-                }
 
-                ComponentInfo info = new ComponentInfo
-                {
-                    type = comp.GetType().Name,
-                    instanceID = comp.GetInstanceID()
-                };
-
-                // 如果是MonoBehaviour,获取脚本路径
-                if (comp is MonoBehaviour monoBehaviour && monoBehaviour != null)
-                {
-                    MonoScript script = MonoScript.FromMonoBehaviour(monoBehaviour);
-                    if (script != null)
+                    // 检查类型过滤
+                    if (componentFilter != null && componentFilter.Length > 0)
                     {
-                        string scriptPath = AssetDatabase.GetAssetPath(script);
-                        if (!string.IsNullOrEmpty(scriptPath))
+                        string typeName = comp.GetType().Name;
+                        bool matched = false;
+                        foreach (string filter in componentFilter)
                         {
-                            info.scriptPath = scriptPath;
+                            if (typeName.Equals(filter, StringComparison.OrdinalIgnoreCase))
+                            {
+                                matched = true;
+                                break;
+                            }
+                        }
+                        if (!matched)
+                        {
+                            continue;
                         }
                     }
+
+                    ComponentInfo info = new ComponentInfo
+                    {
+                        type = comp.GetType().Name,
+                        instanceID = comp.GetInstanceID()
+                    };
+
+                    // 如果是MonoBehaviour,获取脚本路径
+                    if (comp is MonoBehaviour monoBehaviour && monoBehaviour != null)
+                    {
+                        MonoScript script = MonoScript.FromMonoBehaviour(monoBehaviour);
+                        if (script != null)
+                        {
+                            string scriptPath = AssetDatabase.GetAssetPath(script);
+                            if (!string.IsNullOrEmpty(scriptPath))
+                            {
+                                info.scriptPath = scriptPath;
+                            }
+                        }
+                    }
+
+                    // 读取属性
+                    info.properties = SerializedObjectHelper.GetSerializedProperties(comp, includePrivateFields);
+
+                    result.Add(info);
                 }
-
-                // 读取属性
-                info.properties = SerializedObjectHelper.GetSerializedProperties(comp, includePrivateFields);
-
-                result.Add(info);
+                catch (System.Exception ex)
+                {
+                    Debug.LogError($"[ComponentPropertyReader] Error processing component {comp?.GetType().Name ?? "null"}: {ex.Message}\nStack: {ex.StackTrace}");
+                }
             }
 
             return result;
