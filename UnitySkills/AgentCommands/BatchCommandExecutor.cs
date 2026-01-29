@@ -112,32 +112,41 @@ namespace AgentCommands
                     {
                         cmdResult.error = BuildTimeoutError(cmdElapsed, cmdTimeout);
                     }
+                    // 处理参数校验异常(ArgumentException)
+                    else if (ex is ArgumentException && ex.Message != null && ex.Message.StartsWith(AgentCommandErrorCodes.InvalidFields + ":"))
+                    {
+                        // 提取冒号后的详细信息作为detail
+                        string detail = ex.Message.Substring(AgentCommandErrorCodes.InvalidFields.Length + 1).Trim();
+                        cmdResult.error = CommandErrorFactory.CreateInvalidFieldsError(detail);
+                    }
+                    // 处理正则表达式异常
                     else if (ex is InvalidOperationException && ex.Message != null && ex.Message.StartsWith(AgentCommandErrorCodes.InvalidRegex + ":"))
                     {
-                        cmdResult.error = new CommandError
-                        {
-                            code = AgentCommandErrorCodes.InvalidRegex,
-                            message = "正则表达式非法,请检查 keyword",
-                            detail = ex.Message
-                        };
+                        // 提取冒号后的详细信息作为detail,去除前缀
+                        string detail = ex.Message.Substring(AgentCommandErrorCodes.InvalidRegex.Length + 1).Trim();
+                        cmdResult.error = CommandErrorFactory.CreateInvalidRegexError(detail);
                     }
+                    // 处理预制体未找到异常
+                    else if (ex is InvalidOperationException && ex.Message != null && ex.Message.StartsWith("Prefab not found at path: "))
+                    {
+                        string path = ex.Message.Substring("Prefab not found at path: ".Length);
+                        cmdResult.error = CommandErrorFactory.CreatePrefabNotFoundError(path);
+                    }
+                    // 处理GameObject未找到异常
+                    else if (ex is InvalidOperationException && ex.Message != null && ex.Message.StartsWith("GameObject not found at path: "))
+                    {
+                        string path = ex.Message.Substring("GameObject not found at path: ".Length);
+                        cmdResult.error = CommandErrorFactory.CreateGameObjectNotFoundError(path);
+                    }
+                    // 处理未知命令类型异常
                     else if (ex is NotSupportedException)
                     {
-                        cmdResult.error = new CommandError
-                        {
-                            code = AgentCommandErrorCodes.UnknownType,
-                            message = "未知命令类型: " + cmd.type,
-                            detail = ex.Message
-                        };
+                        cmdResult.error = CommandErrorFactory.CreateUnknownCommandError(cmd.type, ex.Message);
                     }
+                    // 其他运行时错误
                     else
                     {
-                        cmdResult.error = new CommandError
-                        {
-                            code = AgentCommandErrorCodes.RuntimeError,
-                            message = "命令执行发生异常",
-                            detail = "异常详情: " + ex.Message
-                        };
+                        cmdResult.error = CommandErrorFactory.CreateRuntimeError("异常详情: " + ex.Message);
                     }
                     batchResult.failedCount++;
                 }
@@ -171,12 +180,7 @@ namespace AgentCommands
                 status = AgentCommandStatuses.Error,
                 startedAt = AgentCommandsConfig.FormatTimestamp(DateTime.Now),
                 finishedAt = AgentCommandsConfig.FormatTimestamp(DateTime.Now),
-                error = new CommandError
-                {
-                    code = AgentCommandErrorCodes.Skipped,
-                    message = "批次超时,命令未执行",
-                    detail = "批次执行时间超过限制 " + batchTimeout + "ms"
-                }
+                error = CommandErrorFactory.CreateSkippedError(batchTimeout)
             };
         }
 
@@ -188,12 +192,7 @@ namespace AgentCommands
         /// <returns>超时错误对象.</returns>
         private static CommandError BuildTimeoutError(TimeSpan elapsed, int timeout)
         {
-            return new CommandError
-            {
-                code = AgentCommandErrorCodes.Timeout,
-                message = "命令执行超时",
-                detail = "命令执行时间 " + (int)elapsed.TotalMilliseconds + "ms 超过限制 " + timeout + "ms"
-            };
+            return CommandErrorFactory.CreateTimeoutError((int)elapsed.TotalMilliseconds, timeout);
         }
     }
 }

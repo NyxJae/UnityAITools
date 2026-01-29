@@ -159,35 +159,35 @@ namespace AgentCommands.Core
         /// <returns>可序列化的json数据.</returns>
         public JsonData ToJsonData()
         {
-            JsonData jd = new JsonData();
-            jd["id"] = id ?? "";
-            jd["type"] = type ?? "";
-            jd["status"] = status ?? "";
-            jd["startedAt"] = startedAt ?? "";
+            JsonData jsonData = new JsonData();
+            jsonData["id"] = id ?? "";
+            jsonData["type"] = type ?? "";
+            jsonData["status"] = status ?? "";
+            jsonData["startedAt"] = startedAt ?? "";
 
             if (status == AgentCommandStatuses.Success || status == AgentCommandStatuses.Error)
             {
-                jd["finishedAt"] = finishedAt ?? "";
+                jsonData["finishedAt"] = finishedAt ?? "";
             }
 
             if (status == AgentCommandStatuses.Error)
             {
-                JsonData ejd = new JsonData();
-                ejd["code"] = error != null ? (error.code ?? "") : "";
-                ejd["message"] = error != null ? (error.message ?? "") : "";
+                JsonData errorJsonData = new JsonData();
+                errorJsonData["code"] = error != null ? (error.code ?? "") : "";
+                errorJsonData["message"] = error != null ? (error.message ?? "") : "";
                 if (error != null && !string.IsNullOrEmpty(error.detail))
                 {
-                    ejd["detail"] = error.detail;
+                    errorJsonData["detail"] = error.detail;
                 }
-                jd["error"] = ejd;
+                jsonData["error"] = errorJsonData;
             }
 
             if (status == AgentCommandStatuses.Success)
             {
-                jd["result"] = result ?? new JsonData();
+                jsonData["result"] = result ?? new JsonData();
             }
 
-            return jd;
+            return jsonData;
         }
     }
 
@@ -305,31 +305,31 @@ namespace AgentCommands.Core
         /// <returns>可序列化的json数据.</returns>
         public JsonData ToJsonData()
         {
-            JsonData jd = new JsonData();
-            jd["id"] = id ?? "";
-            jd["type"] = type ?? "";
-            jd["status"] = status ?? "";
-            jd["startedAt"] = startedAt ?? "";
-            jd["finishedAt"] = finishedAt ?? "";
+            JsonData jsonData = new JsonData();
+            jsonData["id"] = id ?? "";
+            jsonData["type"] = type ?? "";
+            jsonData["status"] = status ?? "";
+            jsonData["startedAt"] = startedAt ?? "";
+            jsonData["finishedAt"] = finishedAt ?? "";
 
             if (status == AgentCommandStatuses.Error)
             {
-                JsonData ejd = new JsonData();
-                ejd["code"] = error != null ? (error.code ?? "") : "";
-                ejd["message"] = error != null ? (error.message ?? "") : "";
+                JsonData errorJsonData = new JsonData();
+                errorJsonData["code"] = error != null ? (error.code ?? "") : "";
+                errorJsonData["message"] = error != null ? (error.message ?? "") : "";
                 if (error != null && !string.IsNullOrEmpty(error.detail))
                 {
-                    ejd["detail"] = error.detail;
+                    errorJsonData["detail"] = error.detail;
                 }
-                jd["error"] = ejd;
+                jsonData["error"] = errorJsonData;
             }
 
             if (status == AgentCommandStatuses.Success)
             {
-                jd["result"] = result ?? new JsonData();
+                jsonData["result"] = result ?? new JsonData();
             }
 
-            return jd;
+            return jsonData;
         }
     }
 
@@ -389,14 +389,14 @@ namespace AgentCommands.Core
         /// <returns>可序列化的json数据.</returns>
         public JsonData ToJsonData()
         {
-            JsonData jd = new JsonData();
-            jd["batchId"] = batchId ?? "";
-            jd["status"] = status ?? "";
-            jd["startedAt"] = startedAt ?? "";
+            JsonData jsonData = new JsonData();
+            jsonData["batchId"] = batchId ?? "";
+            jsonData["status"] = status ?? "";
+            jsonData["startedAt"] = startedAt ?? "";
 
             if (status == BatchStatuses.Completed || status == AgentCommandStatuses.Error)
             {
-                jd["finishedAt"] = finishedAt ?? "";
+                jsonData["finishedAt"] = finishedAt ?? "";
             }
 
             JsonData resultsJson = new JsonData();
@@ -404,25 +404,25 @@ namespace AgentCommands.Core
             {
                 resultsJson.Add(result.ToJsonData());
             }
-            jd["results"] = resultsJson;
+            jsonData["results"] = resultsJson;
 
-            jd["totalCommands"] = totalCommands;
-            jd["successCount"] = successCount;
-            jd["failedCount"] = failedCount;
+            jsonData["totalCommands"] = totalCommands;
+            jsonData["successCount"] = successCount;
+            jsonData["failedCount"] = failedCount;
 
             if (status == AgentCommandStatuses.Error && error != null)
             {
-                JsonData ejd = new JsonData();
-                ejd["code"] = error.code ?? "";
-                ejd["message"] = error.message ?? "";
+                JsonData errorJsonData = new JsonData();
+                errorJsonData["code"] = error.code ?? "";
+                errorJsonData["message"] = error.message ?? "";
                 if (!string.IsNullOrEmpty(error.detail))
                 {
-                    ejd["detail"] = error.detail;
+                    errorJsonData["detail"] = error.detail;
                 }
-                jd["error"] = ejd;
+                jsonData["error"] = errorJsonData;
             }
 
-            return jd;
+            return jsonData;
         }
     }
 }

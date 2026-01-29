@@ -1,6 +1,7 @@
 using System;
 using AgentCommands.Core;
 using AgentCommands.Utils;
+using AgentCommands.Utils.JsonBuilders;
 using LitJson2_utf;
 using UnityEngine;
 
@@ -23,9 +24,9 @@ namespace AgentCommands.Handlers
         /// <returns>结果json.</returns>
         public static JsonData Execute(JsonData rawParams)
         {
-            CommandParams p = new CommandParams(rawParams);
+            CommandParams parameters = new CommandParams(rawParams);
 
-            string prefabPath = p.GetString("prefabPath", null);
+            string prefabPath = parameters.GetString("prefabPath", null);
             
             // 参数验证
             if (string.IsNullOrEmpty(prefabPath))
@@ -40,68 +41,14 @@ namespace AgentCommands.Handlers
                 throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
             }
 
-            bool includeInactive = p.GetBool("includeInactive", true);
-            int maxDepth = p.GetInt("maxDepth");
+            bool includeInactive = parameters.GetBool("includeInactive", true);
+            int maxDepth = parameters.GetInt("maxDepth", -1);
 
             // 遍历层级树
             HierarchyNode hierarchy = HierarchyTraverser.Traverse(prefab, includeInactive, maxDepth);
 
-            // 统计GameObject总数
-            int totalGameObjects = CountGameObjects(hierarchy);
-
-            // 构建结果
-            JsonData result = new JsonData();
-            result.SetJsonType(JsonType.Object);
-            
-            result["prefabPath"] = prefabPath ?? "";
-            result["rootName"] = prefab.name ?? "";
-            result["totalGameObjects"] = totalGameObjects;
-            result["hierarchy"] = BuildHierarchyJson(hierarchy);
-
-            return result;
-        }
-
-        /// <summary>
-        /// 统计层级树中的GameObject总数.
-        /// </summary>
-        private static int CountGameObjects(HierarchyNode node)
-        {
-            if (node == null)
-            {
-                return 0;
-            }
-
-            int count = 1;
-            foreach (var child in node.children)
-            {
-                count += CountGameObjects(child);
-            }
-            return count;
-        }
-
-        /// <summary>
-        /// 构建层级树JSON数据.
-        /// </summary>
-        private static JsonData BuildHierarchyJson(HierarchyNode node)
-        {
-            JsonData json = new JsonData();
-            json.SetJsonType(JsonType.Object);
-
-            json["name"] = node.name ?? "";
-            json["instanceID"] = node.instanceID;
-            json["path"] = node.path ?? "";
-            json["depth"] = node.depth;
-            json["isActive"] = node.isActive;
-
-            JsonData children = new JsonData();
-            children.SetJsonType(JsonType.Array);
-            foreach (var child in node.children)
-            {
-                children.Add(BuildHierarchyJson(child));
-            }
-            json["children"] = children;
-
-            return json;
+            // 构建结果(使用HierarchyJsonBuilder)
+            return HierarchyJsonBuilder.BuildHierarchyResult(prefabPath, prefab, hierarchy);
         }
     }
 }

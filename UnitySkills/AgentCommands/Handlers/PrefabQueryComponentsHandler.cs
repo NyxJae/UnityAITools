@@ -1,6 +1,7 @@
 using System;
 using AgentCommands.Core;
 using AgentCommands.Utils;
+using AgentCommands.Utils.JsonBuilders;
 using LitJson2_utf;
 using UnityEngine;
 
@@ -23,10 +24,10 @@ namespace AgentCommands.Handlers
         /// <returns>结果json.</returns>
         public static JsonData Execute(JsonData rawParams)
         {
-            CommandParams p = new CommandParams(rawParams);
+            CommandParams parameters = new CommandParams(rawParams);
 
-            string prefabPath = p.GetString("prefabPath", null);
-            string objectPath = p.GetString("objectPath", null);
+            string prefabPath = parameters.GetString("prefabPath", null);
+            string objectPath = parameters.GetString("objectPath", null);
             
             // 参数验证
             if (string.IsNullOrEmpty(prefabPath))
@@ -54,9 +55,9 @@ namespace AgentCommands.Handlers
 
             // 获取组件过滤参数
             string[] componentFilter = null;
-            if (p.Has("componentFilter") && p.GetData()["componentFilter"].IsArray)
+            if (parameters.Has("componentFilter") && parameters.GetData()["componentFilter"].IsArray)
             {
-                JsonData filterArray = p.GetData()["componentFilter"];
+                JsonData filterArray = parameters.GetData()["componentFilter"];
                 componentFilter = new string[filterArray.Count];
                 for (int i = 0; i < filterArray.Count; i++)
                 {
@@ -64,42 +65,15 @@ namespace AgentCommands.Handlers
                 }
             }
 
-            bool includeBuiltin = p.GetBool("includeBuiltin", false);
-            bool includePrivateFields = p.GetBool("includePrivateFields", false);
+            bool includeBuiltin = parameters.GetBool("includeBuiltin", false);
+            bool includePrivateFields = parameters.GetBool("includePrivateFields", false);
 
             // 读取组件
             var components = ComponentPropertyReader.ReadComponents(
                 target, componentFilter, includeBuiltin, includePrivateFields);
 
-            // 构建结果
-            JsonData result = new JsonData();
-            result.SetJsonType(JsonType.Object);
-            
-            result["objectPath"] = objectPath;
-            result["instanceID"] = target.GetInstanceID();
-            result["totalComponents"] = components.Count;
-            
-            JsonData componentsJson = new JsonData();
-            componentsJson.SetJsonType(JsonType.Array);
-            foreach (var comp in components)
-            {
-                JsonData compJson = new JsonData();
-                compJson.SetJsonType(JsonType.Object);
-                
-                compJson["type"] = comp.type ?? "";
-                compJson["instanceID"] = comp.instanceID;
-                
-                if (!string.IsNullOrEmpty(comp.scriptPath))
-                {
-                    compJson["scriptPath"] = comp.scriptPath;
-                }
-                
-                compJson["properties"] = comp.properties;
-                componentsJson.Add(compJson);
-            }
-            result["components"] = componentsJson;
-
-            return result;
+            // 构建结果(使用ComponentJsonBuilder)
+            return ComponentJsonBuilder.BuildComponentsResult(objectPath, target, components);
         }
     }
 }

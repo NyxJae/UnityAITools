@@ -23,13 +23,13 @@ namespace AgentCommands.Handlers
         /// <returns>结果json.</returns>
         public static JsonData Execute(JsonData rawParams)
         {
-            CommandParams p = new CommandParams(rawParams);
+            CommandParams parameters = new CommandParams(rawParams);
 
-            int n = p.GetInt("n");
-            string level = p.GetString("level", null);
-            string keyword = p.GetString("keyword", null);
-            string matchMode = p.GetString("matchMode", null);
-            bool includeStack = p.GetBool("includeStack", false);
+            int n = parameters.GetInt("n");
+            string level = parameters.GetString("level", null);
+            string keyword = parameters.GetString("keyword", null);
+            string matchMode = parameters.GetString("matchMode", null);
+            bool includeStack = parameters.GetBool("includeStack", false);
 
             if (!string.IsNullOrEmpty(keyword) && string.IsNullOrEmpty(matchMode))
             {

@@ -41,7 +41,7 @@ namespace AgentCommands.Core
         {
             if (!Has(key))
             {
-                throw new ArgumentException("Missing int param: " + key);
+                throw new ArgumentException(AgentCommandErrorCodes.InvalidFields + ": Missing int param: " + key);
             }
 
             JsonData v = _data[key];
@@ -50,7 +50,26 @@ namespace AgentCommands.Core
             if (v.IsDouble) return (int)(double)v;
             if (v.IsString && int.TryParse((string)v, out int parsed)) return parsed;
 
-            throw new ArgumentException("Invalid int param: " + key);
+            throw new ArgumentException(AgentCommandErrorCodes.InvalidFields + ": Invalid int param: " + key);
+        }
+
+        /// <summary>
+        /// 读取整型参数,缺失则返回默认值.
+        /// </summary>
+        /// <param name="key">字段名.</param>
+        /// <param name="defaultValue">默认值.</param>
+        /// <returns>整型值.</returns>
+        public int GetInt(string key, int defaultValue)
+        {
+            if (!Has(key)) return defaultValue;
+
+            JsonData v = _data[key];
+            if (v.IsInt) return (int)v;
+            if (v.IsLong) return (int)(long)v;
+            if (v.IsDouble) return (int)(double)v;
+            if (v.IsString && int.TryParse((string)v, out int parsed)) return parsed;
+
+            return defaultValue;
         }
 
         /// <summary>
