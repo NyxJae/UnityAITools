@@ -35,6 +35,11 @@ namespace AgentCommands
         internal const double PendingRescanIntervalSeconds = 1.0;
 
         /// <summary>
+        /// 是否格式化输出JSON(默认true,不折叠输出).
+        /// </summary>
+        internal const bool PrettyPrintJson = true;
+
+        /// <summary>
         /// Unity工程Assets目录的绝对路径.
         /// </summary>
         internal static string AssetsAbsolutePath

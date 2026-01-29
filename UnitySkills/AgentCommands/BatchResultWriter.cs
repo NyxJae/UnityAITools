@@ -90,6 +90,7 @@ namespace AgentCommands
             StringBuilder sb = new StringBuilder();
             JsonWriter writer = new JsonWriter(new StringWriter(sb));
             writer.EscapeUnicode = false;
+            writer.PrettyPrint = AgentCommandsConfig.PrettyPrintJson;
             JsonMapper.ToJson(result.ToJsonData(), writer);
             string json = sb.ToString();
             File.WriteAllText(tmpPath, json);

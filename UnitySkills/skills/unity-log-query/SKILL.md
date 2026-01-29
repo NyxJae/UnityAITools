@@ -25,10 +25,10 @@ description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity lo
    使用批量命令格式,即使只执行一个命令也必须使用批量格式
 
    - 文件名: `{batchId}.json`,batchId 建议 16-32 字符,仅 `[a-zA-Z0-9_-]`
-   - 写入 `pending/` 后,一般瞬间完成,可根据 batchId 推测出结果文件路径
+   - 写入 `pending/` 后,一般瞬间完成,可根据 batchId 推测出结果文件路径,结果文件名也会是`{batchId}.json`
 
    单命令示例:
-
+  batch_log_001.json
    ```json
    {
      "batchId": "batch_log_001",
@@ -49,7 +49,7 @@ description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity lo
    ```
 
    多命令示例:
-
+  batch_logs_001.json
    ```json
    {
      "batchId": "batch_logs_001",
@@ -88,14 +88,14 @@ description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity lo
    - `includeStack` 可选,默认 false
 
 3. 直接读取结果
-   你可以推测出结果文件路径,可直接尝试读取,一般能直接拿到结果.不用`ls`等命令
+   你可以推测出结果文件路径,可直接尝试读取,一般能直接拿到结果,不行就再读一次试试.不用`ls`,`sleep`等命令
 
    - 结果路径: `results/{batchId}.json`
    - `status` 可能为 `processing` | `completed` | `error`
    - `error.message` 为中文错误提示,可直接展示
 
    结果示例:
-
+  batch_logs_001.json
    ```json
    {
      "batchId": "batch_logs_001",
