@@ -85,5 +85,14 @@ namespace AgentCommands.Core
 
             return v.ToString();
         }
+
+        /// <summary>
+        /// 获取原始数据对象.
+        /// </summary>
+        /// <returns>原始JsonData对象.</returns>
+        public JsonData GetData()
+        {
+            return _data;
+        }
     }
 }

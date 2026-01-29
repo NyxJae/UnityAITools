@@ -22,7 +22,9 @@ namespace AgentCommands.Core
         {
             _handlers = new Dictionary<string, Func<JsonData, JsonData>>(StringComparer.OrdinalIgnoreCase)
             {
-                { LogQueryCommandHandler.CommandType, LogQueryCommandHandler.Execute }
+                { LogQueryCommandHandler.CommandType, LogQueryCommandHandler.Execute },
+                { PrefabQueryHierarchyHandler.CommandType, PrefabQueryHierarchyHandler.Execute },
+                { PrefabQueryComponentsHandler.CommandType, PrefabQueryComponentsHandler.Execute }
             };
         }
 
