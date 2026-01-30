@@ -38,13 +38,14 @@ description: 查看 Unity 预制体信息. 触发关键词:Unity:预制体,Unity
 **最简单的调用方式** - 直接命令行传参(推荐):
 
 > 💡 使用 `python` 或 `uv run` 执行.注意,以防命令行对多行字符串处理异常,请将JSON参数写在一行内.
+> 💡 脚本最好加引号包裹,避免路径解析问题.
 
 **命令 1: prefab.queryHierarchy (查询层级结构)**
 
 单命令示例 (python):
 
 ```bash
-python <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_prefab_hierarchy_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""includeInactive"":true,""maxDepth"":-1}}]}'
+python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_hierarchy_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""includeInactive"":true,""maxDepth"":-1}}]}'
 ```
 
 **命令参数说明**:
@@ -108,7 +109,7 @@ python <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_prefab
 单命令示例 (uv run):
 
 ```bash
-uv run <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""],""includeBuiltin"":false,""includePrivateFields"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""],""includeBuiltin"":false,""includePrivateFields"":false}}]}'
 ```
 
 **prefab.queryComponents 参数说明**:
@@ -155,7 +156,7 @@ uv run <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_prefab
 **批量命令示例** (组合两个命令):
 
 ```bash
-uv run <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_prefab_full_001"",""timeout"":30000,""commands"":[{""id"":""cmd_hierarchy"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}},{""id"":""cmd_components"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""]}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_full_001"",""timeout"":30000,""commands"":[{""id"":""cmd_hierarchy"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}},{""id"":""cmd_components"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""]}}]}'
 ```
 
 **Python代码调用** (备选方式):

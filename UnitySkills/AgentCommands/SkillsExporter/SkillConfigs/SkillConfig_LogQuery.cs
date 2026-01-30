@@ -38,17 +38,18 @@ description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity lo
 **最简单的调用方式** - 直接命令行传参(推荐):
 
 > 💡 使用 `python` 或 `uv run` 执行.注意,以防命令行对多行字符串处理异常,请将JSON参数写在一行内.
+> 💡 脚本最好加引号包裹,避免路径解析问题.
 
 **单命令示例** (python):
 
 ```bash
-python <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_log_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""log.query"",""params"":{""n"":50,""level"":""Error"",""keyword"":""LoginFailed"",""includeStack"":true}}]}'
+python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_log_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""log.query"",""params"":{""n"":50,""level"":""Error"",""keyword"":""LoginFailed"",""includeStack"":true}}]}'
 ```
 
 **多命令示例** (uv run):
 
 ```bash
-uv run <Scripts Directory>/execute_unity_command.py '{""batchId"":""batch_logs_001"",""timeout"":30000,""commands"":[{""id"":""cmd_error"",""type"":""log.query"",""params"":{""n"":50,""level"":""Error""}},{""id"":""cmd_warning"",""type"":""log.query"",""params"":{""n"":100,""level"":""Warning""}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_logs_001"",""timeout"":30000,""commands"":[{""id"":""cmd_error"",""type"":""log.query"",""params"":{""n"":50,""level"":""Error""}},{""id"":""cmd_warning"",""type"":""log.query"",""params"":{""n"":100,""level"":""Warning""}}]}'
 ```
 
 **命令参数说明**:
