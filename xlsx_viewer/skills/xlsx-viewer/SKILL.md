@@ -11,12 +11,12 @@ description: Excel (.xlsx) 文件查询和分析工具。使用场景：查看�
 
 这个技能帮助你快速查询和分析 Excel (.xlsx) 文件内容，特别适用于游戏配置数据的查看和搜索。工具以 CSV 格式输出数据，便于解析和处理。
 
-**工具位置**：`<Absolute Path>/scripts/xlsx_viewer.exe`
+**工具脚本位置**：`<Scripts Directory>/xlsx_viewer.exe`
 
 ### Usage
 
 ```bash
-<Absolute Path>/scripts/xlsx_viewer.exe --path <xlsx文件路径> <操作类型> [参数]
+<Scripts Directory>/xlsx_viewer.exe --path <xlsx文件路径> <操作类型> [参数]
 ```
 
 ### Parameters
@@ -51,20 +51,20 @@ description: Excel (.xlsx) 文件查询和分析工具。使用场景：查看�
 
 ```bash
 # 查看行列数
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --size
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --size
 
 # 查看前5行,限制20列
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --rows 1 5 --max-cols 20
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --rows 1 5 --max-cols 20
 
 # 查看第10行
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --rows 10
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --rows 10
 
 # 查看前3列,限制100行
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --cols 1 3 --max-rows 100
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --cols 1 3 --max-rows 100
 
 # 在第2列搜索"测试",精确匹配,最多5条
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --search-col 2 "测试" --mode exact --limit 5
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --search-col 2 "测试" --mode exact --limit 5
 
 # 在第1行搜索"error",正则匹配,最多20条
-<Absolute Path>/scripts/xlsx_viewer.exe --path data.xlsx --search-row 1 "error" --mode regex --limit 20
+<Scripts Directory>/xlsx_viewer.exe --path data.xlsx --search-row 1 "error" --mode regex --limit 20
 ```
