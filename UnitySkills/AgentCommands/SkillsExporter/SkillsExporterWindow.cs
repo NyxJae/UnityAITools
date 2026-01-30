@@ -84,6 +84,8 @@ namespace AgentCommands.SkillsExporter
             }
             EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.HelpBox("请选择形如\"~/.claude/\"的路径", MessageType.Info);
+
             if (string.IsNullOrEmpty(_exportPath))
             {
                 EditorGUILayout.HelpBox("请选择导出路径", MessageType.Warning);
