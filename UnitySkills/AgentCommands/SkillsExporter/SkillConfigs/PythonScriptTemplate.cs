@@ -87,8 +87,10 @@ def execute_command(input_json):
                 status = result.get(""status"")
                 if status in [""completed"", ""error""]:
                     # 在结果中添加结果文件路径，方便用户查看原始文件
-                    result[""_resultFile""] = result_file
-                    return result
+                    # 创建新字典,将_resultFile放在最前面,避免输出太长时路径被截断
+                    final_result = {""_resultFile"": result_file}
+                    final_result.update(result)
+                    return final_result
                 # 状态不是completed或error，继续等待
 
         # 等待后再次轮询
