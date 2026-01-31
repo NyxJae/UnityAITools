@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AgentCommands.Handlers;
+using AgentCommands.K3Prefab.Handlers;
 using LitJson2_utf;
 
 namespace AgentCommands.Core
@@ -25,7 +26,9 @@ namespace AgentCommands.Core
                 { LogQueryCommandHandler.CommandType, LogQueryCommandHandler.Execute },
                 { PrefabQueryHierarchyHandler.CommandType, PrefabQueryHierarchyHandler.Execute },
                 { PrefabQueryComponentsHandler.CommandType, PrefabQueryComponentsHandler.Execute },
-                { PrefabSetGameObjectPropertiesHandler.CommandType, PrefabSetGameObjectPropertiesHandler.Execute }
+                { PrefabSetGameObjectPropertiesHandler.CommandType, PrefabSetGameObjectPropertiesHandler.Execute },
+                { K3PrefabQueryByK3IdHandler.CommandType, K3PrefabQueryByK3IdHandler.Execute },
+                { K3PrefabSetComponentPropertiesHandler.CommandType, K3PrefabSetComponentPropertiesHandler.Execute }
             };
         }
 
