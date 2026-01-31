@@ -66,7 +66,7 @@
 - [ ] 接收输入 JSON 并保存到 pending 目录
 - [ ] 使用 batchId 作为 JSON 文件名（简单正则提取或直接从 JSON 读取）
 - [ ] 轮询 results 目录获取结果文件
-- [ ] 根据 batchId 和生成时间筛选结果（生成时间与当前时间小于 5 秒的才认定为新结果）
+- [ ] 根据 batchId 和生成时间筛选结果（生成时间与当前时间小于 3 秒的才认定为新结果）
 - [ ] 读取并返回结果 JSON
 - [ ] 使用占位符 `{AGENT_COMMANDS_DATA_DIR}` 表示 AgentCommands 目录，生成时替换为实际路径
 - [ ] 超时处理：如果 30 秒内没有找到符合条件的结果，抛出 TimeoutError 异常
@@ -87,9 +87,6 @@
 - Python 脚本使用 `time.time()` 计算生成时间差
 - Python 脚本使用 `glob` 模式匹配文件名
 - Python 脚本轮询间隔建议为 0.5 秒
-- Python 脚本支持 UTF-8 编码,解决 Windows 命令行中文乱码问题
-- Python 脚本包含异常处理,捕获文件占用或正在写入的情况
-- Python 脚本返回结果中包含 `_resultFile` 字段,指示结果文件的实际路径
 
 ## 3. 界面设计
 
@@ -132,7 +129,7 @@
 
 **SKILL.md 内容来源说明**：开发者需要从现有 `.snow/skills/` 目录下读取对应的 SKILL.md 文件内容，将其完整内容复制并赋值到 `SkillMarkdown` 字符串常量中。例如，对于 `unity-log-query` 技能，需要读取 `F:/UnityProject/SL/SL_402/.snow/skills/unity-log-query/SKILL.md` 文件内容。
 
-````csharp
+```csharp
 // Assets/Editor/AgentCommands/SkillConfigs/SkillConfig_LogQuery.cs
 public static class SkillConfig_LogQuery
 {
@@ -148,84 +145,10 @@ description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity lo
 
 # Unity Log Query
 
-## Instructions
-
-### Context
-
-本技能用于查询 Unity 编辑器日志,支持按等级、关键词过滤,并包含堆栈信息.
-
-### Steps
-
-**工具脚本**: `<Scripts Directory>/execute_unity_command.py`
-
-**最简单的调用方式** - 直接命令行传参(推荐):
-
-> 💡 使用 `python` 或 `uv run` 执行.注意,以防命令行对多行字符串处理异常,请将JSON参数写在一行内.
-> 💡 脚本最好加引号包裹,避免路径解析问题.
-
-**单命令示例** (python):
-
-```bash
-python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_log_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""log.query"",""params"":{""n"":50,""level"":""Error"",""keyword"":""LoginFailed"",""includeStack"":true}}]}'
-````
-
-**命令参数说明**:
-
-- `batchId` 必填,批次唯一标识(建议 16-32 字符,仅 `[a-zA-Z0-9_-]`)
-- `timeout` 可选,超时时间(毫秒),默认 30000
-- `commands` 必填,命令数组,每个元素包含:
-  - `id` 必填,命令唯一标识
-  - `type` 必填,命令类型,固定为 `""log.query""`
-  - `params` 必填,查询参数:
-    - `n` 必填,返回最近 n 条日志
-    - `level` 可选,日志等级: `Log`/`Warning`/`Error`
-    - `keyword` 可选,关键词过滤
-    - `matchMode` 可选,匹配模式: `Fuzzy`(默认)/`Regex`
-    - `includeStack` 可选,是否包含堆栈,默认 `false`
-
-**返回结果示例**:
-
-```json
-{
-  ""batchId"": ""batch_logs_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_error"",
-      ""type"": ""log.query"",
-      ""status"": ""success"",
-      ""result"": {
-        ""items"": [
-          {
-            ""time"": ""2026-01-20T07:53:00Z"",
-            ""level"": ""Error"",
-            ""message"": ""Login failed"",
-            ""stack"": ""UnityEngine.Debug:LogError(...)""
-          }
-        ],
-        ""totalCaptured"": 150,
-        ""returned"": 10
-      }
-    }
-  ],
-  ""successCount"": 1,
-  ""failedCount"": 0
+... (完整的SKILL.md内容，从现有文件中复制)
+";
 }
 ```
-
-### Notes
-
-- 命令行方式无需创建任何文件,直接在终端执行即可
-- 批量命令采用串行执行,严格按输入顺序
-- 批量命令支持部分成功模式,单个命令失败不影响后续执行
-- 正则非法会返回 error,不会崩溃插件
-- 命令超时优先级高于批次超时
-- `status` 可能为 `processing`/`completed`/`error`
-- `error.message` 为中文错误提示,可直接展示
-  ";
-  }
-
-````
 
 ### 4.2 集中配置管理
 
@@ -259,7 +182,7 @@ public static class SkillConfigsRegistry
         return AllSkills.Values;
     }
 }
-````
+```
 
 ### 4.3 Python 脚本模板
 
@@ -390,15 +313,13 @@ if __name__ == "__main__":
 
 ### 4.4 路径替换逻辑
 
-生成 Python 脚本时，需要将占位符 `{AGENT_COMMANDS_DATA_DIR}` 替换为实际的 AgentCommands 目录路径。代码中使用原始字符串 `r''` 来避免 Windows 路径中的反斜杠被当作转义符：
+生成 Python 脚本时，需要将占位符 `{AGENT_COMMANDS_DATA_DIR}` 替换为实际的 AgentCommands 目录路径：
 
 ```csharp
 string agentCommandsDir = "F:/UnityProject/SL/SL_402/Code/Assets/AgentCommands";
-string pythonScriptContent = SkillConfigsRegistry.GetPythonScriptTemplate();
+string pythonScriptContent = SkillConfigsRegistry.PythonScriptTemplate;
 string replacedContent = pythonScriptContent.Replace("{AGENT_COMMANDS_DATA_DIR}", agentCommandsDir);
 ```
-
-**注意**: Python 模板中使用 `r"{AGENT_COMMANDS_DATA_DIR}"` 原始字符串格式,确保路径中的反斜杠不会被转义。
 
 ## 5. 举例覆盖需求和边缘情况
 
@@ -602,14 +523,14 @@ except ValueError as e:
 - Python 脚本会将新命令写入 `pending/batch_log_001.json`
 - Unity 插件处理后，生成新的结果文件到 `results/batch_log_001.json`
 - 由于同名文件被覆盖，文件的修改时间更新为当前时间
-- Python 脚本检测到文件修改时间与当前时间差小于 5 秒，认定为新结果
+- Python 脚本检测到文件修改时间与当前时间差小于 3 秒，认定为新结果
 - 读取并返回结果
 
 **关键代码**：
 
 ```python
 file_time = os.path.getmtime(result_file)  # 获取文件修改时间
-if time.time() - file_time <= MAX_RESULT_AGE:  # MAX_RESULT_AGE = 5
+if time.time() - file_time <= MAX_RESULT_AGE:  # MAX_RESULT_AGE = 3
     # 认定为新生成的结果
     with open(result_file, 'r', encoding='utf-8') as f:
         result = json.load(f)
@@ -710,9 +631,8 @@ Code/Assets/Editor/AgentCommands/
 │       ├── SkillConfig_LogQuery.cs    # 日志查询技能配置
 │       ├── SkillConfig_PrefabView.cs  # 预制体查看技能配置
 │       └── PythonScriptTemplate.cs    # Python脚本模板常量
+└── (现有的其他文件...)
 ```
-
-**命名空间**: `AgentCommands.SkillsExporter`
 
 ### 6.2 EditorPrefs Key 命名规范
 

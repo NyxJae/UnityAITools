@@ -56,6 +56,7 @@ namespace AgentCommands.Utils.JsonBuilders
             json["name"] = node.name ?? "";
             json["instanceID"] = node.instanceID;
             json["path"] = node.path ?? "";
+            json["siblingIndex"] = node.siblingIndex;
             json["depth"] = node.depth;
             json["isActive"] = node.isActive;
 

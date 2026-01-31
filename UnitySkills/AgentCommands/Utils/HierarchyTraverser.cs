@@ -12,6 +12,7 @@ namespace AgentCommands.Utils
         public string name;
         public int instanceID;
         public string path;
+        public int siblingIndex;
         public int depth;
         public bool isActive;
         public List<HierarchyNode> children;
@@ -87,6 +88,7 @@ namespace AgentCommands.Utils
                     name = child.name,
                     instanceID = child.gameObject.GetInstanceID(),
                     path = GameObjectPathFinder.GetPath(child.gameObject),
+                    siblingIndex = child.GetSiblingIndex(),
                     depth = currentDepth + 1,
                     isActive = child.gameObject.activeSelf
                 };

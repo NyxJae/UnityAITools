@@ -28,6 +28,7 @@ namespace AgentCommands.Handlers
 
             string prefabPath = parameters.GetString("prefabPath", null);
             string objectPath = parameters.GetString("objectPath", null);
+            int siblingIndex = parameters.GetInt("siblingIndex", 0);
 
             // 参数验证
             if (string.IsNullOrEmpty(prefabPath))
@@ -47,10 +48,10 @@ namespace AgentCommands.Handlers
             }
 
             // 定位目标GameObject
-            GameObject target = GameObjectPathFinder.FindByPath(prefab, objectPath);
+            GameObject target = GameObjectPathFinder.FindByPath(prefab, objectPath, siblingIndex);
             if (target == null)
             {
-                throw new InvalidOperationException("GameObject not found at path: " + objectPath);
+                throw new InvalidOperationException("GameObject not found at path: " + objectPath + " (siblingIndex=" + siblingIndex + ")");
             }
 
             // 获取组件过滤参数

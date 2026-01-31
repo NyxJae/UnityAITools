@@ -60,7 +60,7 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 **prefab.queryHierarchy 参数说明**:
 
 - `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
-- 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
+- 路径分隔符自动适配,支持 Windows 反斜杠(\\) 和 macOS/Linux 正斜杠(/)
 - `includeInactive` 可选,是否包含禁用的 GameObject,默认 true
 - `maxDepth` 可选,最大遍历深度,-1 表示无限,默认 -1
 
@@ -84,6 +84,7 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
             ""name"": ""DialogMain"",
             ""instanceID"": 123456789,
             ""path"": ""DialogMain"",
+            ""siblingIndex"": 0,
             ""depth"": 0,
             ""isActive"": true,
             ""children"": [
@@ -91,6 +92,7 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
                 ""name"": ""Panel_Content"",
                 ""instanceID"": 234567890,
                 ""path"": ""DialogMain/Panel_Content"",
+                ""siblingIndex"": 0,
                 ""depth"": 1,
                 ""isActive"": true,
                 ""children"": []
@@ -115,8 +117,9 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 **prefab.queryComponents 参数说明**:
 
 - `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
-- 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
+- 路径分隔符自动适配,支持 Windows 反斜杠(\\) 和 macOS/Linux 正斜杠(/)
 - `objectPath` 必填,GameObject 层级路径(从 prefab.queryHierarchy 返回的 path 字段获取)
+- `siblingIndex` 可选,同级索引(从 0 开始),用于定位同路径下的同名对象,默认 0
 - `componentFilter` 可选,组件类型过滤,null 表示全部
 - `includeBuiltin` 可选,是否包含 Unity 内置组件(RectTransform, Transform 等),默认 false
 - `includePrivateFields` 可选,是否包含私有字段(带 SerializeField 标记的),默认 false
@@ -170,6 +173,7 @@ result = execute_command({""batchId"":""x"",""commands"":[{""type"":""prefab.que
 
 - 命令行方式无需创建任何文件,直接在终端执行即可
 - objectPath 必须从 prefab.queryHierarchy 的结果中获取,确保路径正确
+- `siblingIndex` 用于定位同一路径下的同名 GameObject,从 prefab.queryHierarchy 返回的 siblingIndex 字段获取
 - prefab.queryComponents 中 properties 支持嵌套结构(数组、对象等)
 - 批量命令采用串行执行,严格按输入顺序
 - 批量命令支持部分成功模式,单个命令失败不影响后续执行
@@ -179,9 +183,20 @@ result = execute_command({""batchId"":""x"",""commands"":[{""type"":""prefab.que
 ### 流程
 
 1. 先用 prefab.queryHierarchy 获取预制体的完整层级结构
-2. 根据层级结构找到感兴趣的 GameObject 及其 path
-3. 用 prefab.queryComponents 查询该 GameObject 的组件信息
+2. 根据层级结构找到感兴趣的 GameObject 及其 path 和 siblingIndex
+3. 用 prefab.queryComponents 查询该 GameObject 的组件信息(如果存在同名对象,需传入 siblingIndex)
 4. 如需查看多个 GameObject,可在批量命令中组合使用两个命令
+
+**处理同名对象示例**:
+
+如果预制体中存在多个同名 GameObject (如两个 K3Button_Confirm):
+1. 从 prefab.queryHierarchy 返回结果中获取目标对象的 siblingIndex
+2. 调用 prefab.queryComponents 时传入 siblingIndex 参数精确定位
+
+```bash
+# 查询第二个 K3Button_Confirm (siblingIndex=1)
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""x"",""commands"":[{""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/.../DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""siblingIndex"":1}}]}'
+```
 ";
     }
 }
