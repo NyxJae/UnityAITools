@@ -24,7 +24,8 @@ namespace AgentCommands.Core
             {
                 { LogQueryCommandHandler.CommandType, LogQueryCommandHandler.Execute },
                 { PrefabQueryHierarchyHandler.CommandType, PrefabQueryHierarchyHandler.Execute },
-                { PrefabQueryComponentsHandler.CommandType, PrefabQueryComponentsHandler.Execute }
+                { PrefabQueryComponentsHandler.CommandType, PrefabQueryComponentsHandler.Execute },
+                { PrefabSetGameObjectPropertiesHandler.CommandType, PrefabSetGameObjectPropertiesHandler.Execute }
             };
         }
 

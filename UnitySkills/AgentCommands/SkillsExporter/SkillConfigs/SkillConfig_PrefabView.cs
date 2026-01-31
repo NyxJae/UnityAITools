@@ -60,7 +60,7 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 **prefab.queryHierarchy 参数说明**:
 
 - `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
-- 路径分隔符自动适配,支持 Windows 反斜杠(\\) 和 macOS/Linux 正斜杠(/)
+- 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
 - `includeInactive` 可选,是否包含禁用的 GameObject,默认 true
 - `maxDepth` 可选,最大遍历深度,-1 表示无限,默认 -1
 
@@ -117,7 +117,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 **prefab.queryComponents 参数说明**:
 
 - `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
-- 路径分隔符自动适配,支持 Windows 反斜杠(\\) 和 macOS/Linux 正斜杠(/)
+- 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
 - `objectPath` 必填,GameObject 层级路径(从 prefab.queryHierarchy 返回的 path 字段获取)
 - `siblingIndex` 可选,同级索引(从 0 开始),用于定位同路径下的同名对象,默认 0
 - `componentFilter` 可选,组件类型过滤,null 表示全部
