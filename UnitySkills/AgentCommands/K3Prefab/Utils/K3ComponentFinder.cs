@@ -148,21 +148,29 @@ namespace AgentCommands.K3Prefab.Utils
 
         /// <summary>
         /// 从IK3Component获取对应的GameObject
+        /// 优先使用Component.gameObject避免访问可能未赋值的recttransform
         /// </summary>
         private static GameObject GetGameObjectFromComponent(IK3Component component)
         {
             if (component == null) return null;
 
-            // 尝试通过recttransform获取GameObject
-            if (component.recttransform != null)
-            {
-                return component.recttransform.gameObject;
-            }
-
-            // 尝试将component转换为Component获取GameObject
+            // 优先将component转换为Component获取GameObject(避免访问recttransform getter)
             if (component is Component unityComponent)
             {
                 return unityComponent.gameObject;
+            }
+
+            // 备用方案: 尝试通过recttransform获取GameObject
+            try
+            {
+                if (component.recttransform != null)
+                {
+                    return component.recttransform.gameObject;
+                }
+            }
+            catch (System.Exception)
+            {
+                // recttransform getter可能因字段未赋值而抛异常,忽略
             }
 
             return null;

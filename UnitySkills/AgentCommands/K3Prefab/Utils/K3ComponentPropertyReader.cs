@@ -55,17 +55,25 @@ namespace AgentCommands.K3Prefab.Utils
                 }
             }
 
-            // 读取IK3Component接口属性（避免访问可能触发验证的getter）
+            // 读取IK3Component接口属性（添加异常保护避免字段未赋值时失败）
             result["ID"] = (JsonData)componentId;
-            result["alpha"] = (JsonData)component.alpha;
+            
+            // 使用try-catch保护属性读取,避免因字段未赋值导致整个组件数据丢失
+            try { result["alpha"] = (JsonData)component.alpha; } 
+            catch (System.Exception) { result["alpha"] = (JsonData)1.0f; }
+            
+            try { result["x"] = (JsonData)component.x; } 
+            catch (System.Exception) { result["x"] = (JsonData)0f; }
+            
+            try { result["y"] = (JsonData)component.y; } 
+            catch (System.Exception) { result["y"] = (JsonData)0f; }
+            
+            try { result["IsVisible"] = (JsonData)component.IsVisible; } 
+            catch (System.Exception) { result["IsVisible"] = (JsonData)true; }
+            
             result["atlasName"] = component.atlasName ?? string.Empty;
             result["picName"] = component.picName ?? string.Empty;
-            result["IsVisible"] = (JsonData)component.IsVisible;
             result["ComponentName"] = component.ComponentName ?? string.Empty;
-
-            // 读取位置信息
-            result["x"] = (JsonData)component.x;
-            result["y"] = (JsonData)component.y;
 
             // 读取K3Property对象的其他属性
             if (component.property != null)

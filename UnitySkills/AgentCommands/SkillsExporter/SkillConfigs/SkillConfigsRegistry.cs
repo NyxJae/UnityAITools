@@ -47,6 +47,13 @@ namespace AgentCommands.SkillsExporter
                         Description = SkillConfig_PrefabView.SkillDescription,
                         Markdown = SkillConfig_PrefabView.SkillMarkdown
                     }
+                },
+                { SkillConfig_K3Prefab.SkillName, new SkillConfig
+                    {
+                        Name = SkillConfig_K3Prefab.SkillName,
+                        Description = SkillConfig_K3Prefab.SkillDescription,
+                        Markdown = SkillConfig_K3Prefab.SkillMarkdown
+                    }
                 }
             };
         }
