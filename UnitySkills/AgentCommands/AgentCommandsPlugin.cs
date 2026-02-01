@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using AgentCommands.Core;
 using UnityEditor;
+using UnityEngine;
 
 namespace AgentCommands
 {
@@ -78,12 +79,6 @@ namespace AgentCommands
         /// </summary>
         static AgentCommandsPlugin()
         {
-            // 运行游戏期间仍要处理命令.
-            // if (Application.isPlaying)
-            // {
-            //     return;
-            // }
-
             Initialize();
         }
 
@@ -103,10 +98,37 @@ namespace AgentCommands
             EnsureDirectories();
             LogCache.Initialize();
 
+            // 加载所有命令插件
+            LoadCommandPlugins();
+
             RegisterWatcher();
             EnqueueAllPendingFiles();
 
             _nextRescanTime = EditorApplication.timeSinceStartup + AgentCommandsConfig.PendingRescanIntervalSeconds;
+        }
+
+        /// <summary>
+        /// 加载所有命令插件.
+        /// </summary>
+        private static void LoadCommandPlugins()
+        {
+            try
+            {
+                var result = CommandPluginLoader.LoadAllPlugins();
+
+                if (result.CriticalFailure)
+                {
+                    Debug.LogError("[AgentCommands] CRITICAL: 核心命令加载失败,框架不可用!");
+                }
+                else if (!result.IsFrameworkFunctional)
+                {
+                    Debug.LogWarning("[AgentCommands] WARNING: 框架不可用,核心命令未正确注册");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[AgentCommands] 插件加载过程中发生异常: {ex}");
+            }
         }
 
         /// <summary>
@@ -133,6 +155,7 @@ namespace AgentCommands
             EditorApplication.update -= OnEditorUpdate;
             DisposeWatcher();
             LogCache.Shutdown();
+            CommandPluginLoader.ShutdownAllPlugins();
         }
 
         /// <summary>
@@ -294,9 +317,6 @@ namespace AgentCommands
         /// </summary>
         private static void OnEditorUpdate()
         {
-            // 运行游戏期间仍要处理命令.
-            // if (Application.isPlaying) return;
-
             // 双保险:定时扫描 pending.
             double now = EditorApplication.timeSinceStartup;
             if (now >= _nextRescanTime)

@@ -10,11 +10,18 @@
 - `results/` - 输出结果，最多保留最近 20 条结果
 - `done/` - 归档备份，处理完的命令文件移动到这里
 
+**插件化架构**: 采用反射插件系统，支持通过 `ICommandPlugin` 接口扩展命令。
+
 目前已实现的命令类型包括：
 
-- `log.query` - 日志查询
-- `prefab.queryHierarchy` - 预制体层级查询
-- `prefab.queryComponents` - 预制体组件查询
+- `log.query` - 日志查询（内置命令，Priority 0）
+- `prefab.queryHierarchy` - 预制体层级查询（Prefab 插件，Priority 20）
+- `prefab.queryComponents` - 预制体组件查询（Prefab 插件，Priority 20）
+- `prefab.setGameObjectProperties` - GameObject 属性修改（Prefab 插件，Priority 20）
+- `k3prefab.queryByK3Id` - K3 组件查询（K3Prefab 插件，Priority 100）
+- `k3prefab.setComponentProperties` - K3 组件属性修改（K3Prefab 插件，Priority 100）
+
+详见 `01_整体与框架需求.md` 第 6 节"模块化/可扩展性要求"。
 
 同时，项目中已手动创建了两个技能文件夹在 `.snow/skills/` 目录下：
 
