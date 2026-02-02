@@ -626,20 +626,34 @@ D:/Dev/snow-skills/
 
 ### 6.1 目录结构
 
-新增的插件文件结构：
+**新增的插件文件结构** (已实现轻量化架构):
 
 ```
 Code/Assets/Editor/AgentCommands/
-├── SkillsExporter/
-│   ├── SkillsExporterWindow.cs        # 主窗口类
-│   ├── SkillsExporterMenuItem.cs      # 菜单项
-│   └── SkillConfigs/                  # 技能配置目录
-│       ├── SkillConfigsRegistry.cs    # 集中配置
-│       ├── SkillConfig_LogQuery.cs    # 日志查询技能配置
-│       ├── SkillConfig_PrefabView.cs  # 预制体查看技能配置
-│       └── PythonScriptTemplate.cs    # Python脚本模板常量
+├── UI/                                      # 【新增】轻量化UI架构
+│   ├── SkillsExporterWindow.cs              # 主窗口（使用TabContentManager管理tabs）
+│   ├── Components/
+│   │   ├── ITabContent.cs                   # Tab内容接口
+│   │   └── TabContentManager.cs             # Tab管理器
+│   └── Tabs/                                # 各个Tab页面实现
+│       ├── SkillsExportTab.cs               # 技能导出Tab（实现ITabContent）
+│       └── AutoCompileTab.cs                # AutoCompile配置Tab（实现ITabContent）
+├── SkillsExporter/                          # 【保留】技能配置管理
+│   ├── SkillsExporterMenuItem.cs            # 菜单项（向后兼容）
+│   └── SkillConfigs/
+│       ├── SkillConfigsRegistry.cs          # 集中配置
+│       ├── SkillConfig_LogQuery.cs          # 日志查询技能配置
+│       ├── SkillConfig_PrefabView.cs        # 预制体查看技能配置
+│       ├── SkillConfig_K3Prefab.cs          # K3预制体技能配置
+│       └── PythonScriptTemplate.cs          # Python脚本模板
 └── (现有的其他文件...)
 ```
+
+**轻量化 Tab 架构优势**:
+
+- 新增 tab 只需实现 `ITabContent` 接口并在主窗口注册
+- Tab 页面逻辑完全分离,职责清晰
+- 自动管理 tab 切换和状态
 
 ### 6.2 EditorPrefs Key 命名规范
 
