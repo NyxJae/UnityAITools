@@ -4,7 +4,7 @@
 
 ### 1.1 现状
 
-项目中已有完整的 Jason 命令监听处理系统，核心插件位于 `Code/Assets/Editor/AgentCommands/`，该插件使用 `FileSystemWatcher` 监听三个子文件夹：
+项目中已有完整的 Jason 命令监听处理系统,核心插件位于 `Code/Assets/Editor/UnityAgentSkills/`,该插件使用 `FileSystemWatcher` 监听三个子文件夹:
 
 - `pending/` - 输入队列，外部工具写入命令 JSON 的位置
 - `results/` - 输出结果，最多保留最近 20 条结果
@@ -12,10 +12,11 @@
 
 **插件化架构**: 采用反射插件系统，支持通过 `ICommandPlugin` 接口扩展命令。
 
-目前已实现的命令类型包括：
+系统提供的命令类型包括：
 
-- `log.query` - 日志查询（内置命令，Priority 0）
-- `prefab.queryHierarchy` - 预制体层级查询（Prefab 插件，Priority 20）
+- `log.query` - 日志查询(内置命令,priority 0)
+- `log.screenshot` - 日志截图(内置命令,priority 0)
+- `prefab.queryHierarchy` - 预制体层级查询(Prefab 插件,priority 20)
 - `prefab.queryComponents` - 预制体组件查询（Prefab 插件，Priority 20）
 - `prefab.setGameObjectProperties` - GameObject 属性修改（Prefab 插件，Priority 20）
 - `k3prefab.queryByK3Id` - K3 组件查询（K3Prefab 插件，Priority 100）
@@ -25,7 +26,7 @@
 
 同时，项目中已手动创建了两个技能文件夹在 `.snow/skills/` 目录下：
 
-- `unity-log-query/` - 包含 SKILL.md 说明文档
+- `unity-log/` - 包含 SKILL.md 说明文档
 - `unity-prefab-view/` - 包含 SKILL.md 说明文档
 - `xlsx-viewer/` - 作为参考，展示了技能文件夹的标准结构（包含 SKILL.md 和 scripts/子文件夹）
 
@@ -39,7 +40,7 @@
 - 每个技能以独立文件夹形式导出，包含完整的说明文档和通用 Python 脚本
 - 便于后续用户更新技能内容
 
-**目的 2：提供 Python 脚本，简化和规范化 Unity AgentCommands 插件的使用**
+**目的 2：提供 Python 脚本，简化和规范化 UnityAgentSkills 插件的使用**
 
 - 不需要手动去寻找命令 JSON 文件发布的文件夹
 - 不需要手动去结果文件夹中查找结果文件是否生成
@@ -63,7 +64,7 @@
 
 **技能配置管理：**
 
-- [ ] 每个技能一个独立的 C#配置文件，位于 `Assets/Editor/AgentCommands/SkillConfigs/` 目录
+- [ ] 每个技能一个独立的 C#配置文件，位于 `Assets/Editor/UnityAgentSkills/SkillConfigs/` 目录
 - [ ] 配置文件只包含 SKILL.md 的完整字符串内容
 - [ ] 代码中有集中配置的地方，统一管理所有技能配置
 - [ ] 新增技能时，只需新建一个 C#配置文件并在集中配置中添加几行代码
@@ -74,8 +75,8 @@
 - [ ] 使用 batchId 作为 JSON 文件名（简单正则提取或直接从 JSON 读取）
 - [ ] 轮询 results 目录获取结果文件
 - [ ] 根据 batchId 和生成时间筛选结果（生成时间与当前时间小于 3 秒的才认定为新结果）
-- [ ] 读取并返回结果 JSON
-- [ ] 使用占位符 `{AGENT_COMMANDS_DATA_DIR}` 表示 AgentCommands 目录，生成时替换为实际路径
+- [ ] 导出时,脚本中需要注入 UnityAgentSkills 数据目录的绝对路径
+
 - [ ] 超时处理：如果 30 秒内没有找到符合条件的结果，抛出 TimeoutError 异常
 - [ ] 不对输入输出 JSON 做任何校验（除了 batchId 缺失的情况），Unity 插件内部已做完整处理
 - [ ] 支持直接以命令行参数形式使用（推荐），JSON 字符串作为命令行参数传入
@@ -107,7 +108,7 @@
 ├─────────────────────────────────────────────────┤
 │  [☑] 全选  [ ] 取消全选                         │
 ├─────────────────────────────────────────────────┤
-│  ☑ unity-log-query      Unity日志查询技能        │
+│  ☑ unity-log            Unity日志技能(含查询与截图)        │
 │  ☑ unity-prefab-view    Unity预制体查看技能       │
 │  ☐ [其他技能...]                              │
 ├─────────────────────────────────────────────────┤
@@ -130,92 +131,71 @@
 
 ## 4. 技术实现要点
 
-### 4.1 技能配置文件结构
+### 4.1 SkillConfig 命名与约束(必须)
 
-每个技能对应一个 C#配置文件，例如 `SkillConfig_LogQuery.cs`。
+- 目录范围: `Code/Assets/Editor/UnityAgentSkills/SkillsExporter/SkillConfigs/`.
+- 业务 SkillConfig 的文件名与类名规范:
+  - 文件名: `SkillConfig_UnityXxx.cs`.
+  - 类名: `SkillConfig_UnityXxx`.
+  - `Xxx` 使用 PascalCase,语义与该 skill 的用途对齐.
+- skillId(也即 SkillConfig 中的 `SkillName`)默认保持既有对外约定,除非需求明确要求调整.
 
-**SKILL.md 内容来源说明**：开发者需要从现有 `.snow/skills/` 目录下读取对应的 SKILL.md 文件内容，将其完整内容复制并赋值到 `SkillMarkdown` 字符串常量中。例如，对于 `unity-log-query` 技能，需要读取 `F:/UnityProject/SL/SL_402/.snow/skills/unity-log-query/SKILL.md` 文件内容。
+### 4.2 本项目导出的 skills 列表(必须)
 
-```csharp
-// Assets/Editor/AgentCommands/SkillConfigs/SkillConfig_LogQuery.cs
-public static class SkillConfig_LogQuery
-{
-    public const string SkillName = "unity-log-query";
-    public const string SkillDescription = "Unity日志查询技能";
+SkillsExporter UI 中可选择并导出的 skills 固定为 3 个:
 
-    // SKILL.md的完整内容
-    // 开发者需要从 .snow/skills/unity-log-query/SKILL.md 文件中读取并复制完整内容
-    public const string SkillMarkdown = @"---
-name: unity-log-query
-description: 查询 Unity 编辑器日志. 触发关键词:Unity:日志,Unity log
----
+- `unity-log`
+- `unity-prefab-view`
+- `unity-k3-prefab`
 
-# Unity Log Query
+不提供任何旧 skillId 的 alias/兼容入口.
 
-... (完整的SKILL.md内容，从现有文件中复制)
-";
-}
-```
+### 4.3 `unity-log` skill 的对外约束(必须)
 
-### 4.2 集中配置管理
+- 正式 skillId: `unity-log`.
 
-在 `SkillConfigsRegistry.cs` 中统一管理所有技能：
+`unity-log` 的导出文档(SkillMarkdown,最终会导出为 SKILL.md)必须满足:
 
-```csharp
-// Assets/Editor/AgentCommands/SkillConfigs/SkillConfigsRegistry.cs
-public static class SkillConfigsRegistry
-{
-    private static readonly Dictionary<string, SkillConfig> AllSkills = new Dictionary<string, SkillConfig>
-    {
-        { SkillConfig_LogQuery.SkillName, new SkillConfig
-            {
-                Name = SkillConfig_LogQuery.SkillName,
-                Description = SkillConfig_LogQuery.SkillDescription,
-                Markdown = SkillConfig_LogQuery.SkillMarkdown
-            }
-        },
-        { SkillConfig_PrefabView.SkillName, new SkillConfig
-            {
-                Name = SkillConfig_PrefabView.SkillName,
-                Description = SkillConfig_PrefabView.SkillDescription,
-                Markdown = SkillConfig_PrefabView.SkillMarkdown
-            }
-        }
-        // 新增技能时，在这里添加配置
-    };
+1. 必须同时包含两条命令的说明:
+   - `log.query`
+   - `log.screenshot`
+2. 描述中必须包含至少以下触发关键词(用于非技术同学或外部系统通过关键词触发):
+   - `Unity:日志`
+   - `Unity log`
+   - `Unity:截图`
+   - `Unity screenshot`
+3. 对 `log.screenshot` 的说明必须覆盖以下信息:
+   - 截图对象: Game 视图,包含 UI.
+   - 输出位置: `Assets/UnityAgentSkills/results/`.
+   - 返回结果: 返回 `imageAbsolutePath`(单张截图).
+   - 重要语义: `status=success` 表示截图文件已真实落盘且可读.
 
-    public static IEnumerable<SkillConfig> GetAllSkills()
-    {
-        return AllSkills.Values;
-    }
-}
-```
+- 等待落盘必须不阻塞 Unity Editor 主进程.
+- 允许 results 从 processing 延迟后再 completed(直到文件可读才写 success).
 
-### 4.3 Python 脚本模板
+### 4.4 SkillConfig 内容来源与导出规则(必须)
 
-所有技能使用相同的 Python 脚本模板，位于集中配置的字符串常量中：
+- 每个 skill 对应一个 SkillConfig 文件,包含:
+  - `SkillName`: skillId,用于 UI 展示与导出目录名.
+  - `SkillDescription`: UI 列表的描述文案.
+  - `SkillMarkdown`: 导出文档内容,会写入 `<exportDir>/skills/<skillId>/SKILL.md`.
+- `SkillMarkdown` 的内容来源:
+  - 开发者从 `.snow/skills/<skillId>/SKILL.md` 读取完整内容,复制到 `SkillMarkdown` 常量中.
 
-```python
-import json
-import os
-import sys
-import glob
-import time
+### 4.5 Python 脚本模板(必须)
 
-# 占位符，生成时会被替换为实际路径，例如：F:/UnityProject/SL/SL_402/Code/Assets/AgentCommands
-AGENT_COMMANDS_DATA_DIR = "{AGENT_COMMANDS_DATA_DIR}"
-
-PENDING_DIR = os.path.join(AGENT_COMMANDS_DATA_DIR, "pending")
-RESULTS_DIR = os.path.join(AGENT_COMMANDS_DATA_DIR, "results")
-DONE_DIR = os.path.join(AGENT_COMMANDS_DATA_DIR, "done")
+- 所有 skills 使用同一份 Python 脚本模板.
+- 导出时,每个 skill 的脚本固定生成在:
+  - `<exportDir>/skills/<skillId>/scripts/execute_unity_command.py`
+- 脚本会通过占位符注入 UnityAgentSkills 数据目录的绝对路径(用于拼接 pending/results/done 路径).
 
 TIMEOUT = 30 # 超时时间（秒）
 POLL_INTERVAL = 0.5 # 轮询间隔（秒）
 MAX_RESULT_AGE = 3 # 结果文件最大年龄（秒）
 
 def execute_command(input_json):
-    """
-    执行命令并返回结果
+"""
+执行命令并返回结果
 
     Args:
         input_json: 输入JSON字符串或字典，必须包含batchId字段
@@ -270,31 +250,28 @@ def execute_command(input_json):
     raise TimeoutError(f"Timeout after {TIMEOUT} seconds. No result found for batchId: {batch_id}")
 
 # 命令行入口
-if __name__ == "__main__":
-    # 检查命令行参数
-    if len(sys.argv) > 1:
-        # 从命令行参数获取JSON字符串（推荐方式）
-        # 示例: python execute_unity_command.py '{"batchId":"batch_001","commands":[...]}'
-        input_json_str = " ".join(sys.argv[1:])
-    else:
-        # 示例用法（当没有参数时）
-        example_input = {
-            "batchId": "batch_log_001",
-            "timeout": 30000,
-            "commands": [{
-                "id": "cmd_001",
-                "type": "log.query",
-                "params": {
-                    "n": 50,
-                    "level": "Error"
-                }
-            }]
-        }
-        print("Usage: python execute_unity_command.py '<JSON_STRING>'")
-        print("Example:")
-        example_json = json.dumps(example_input, ensure_ascii=False)
-        print(f"  python execute_unity_command.py '{example_json}'")
-        sys.exit(1)
+
+if **name** == "**main**": # 检查命令行参数
+if len(sys.argv) > 1: # 从命令行参数获取 JSON 字符串（推荐方式） # 示例: python execute_unity_command.py '{"batchId":"batch_001","commands":[...]}'
+input_json_str = " ".join(sys.argv[1:])
+else: # 示例用法（当没有参数时）
+example_input = {
+"batchId": "batch_log_001",
+"timeout": 30000,
+"commands": [{
+"id": "cmd_001",
+"type": "log.query",
+"params": {
+"n": 50,
+"level": "Error"
+}
+}]
+}
+print("Usage: python execute_unity_command.py '<JSON_STRING>'")
+print("Example:")
+example_json = json.dumps(example_input, ensure_ascii=False)
+print(f" python execute_unity_command.py '{example_json}'")
+sys.exit(1)
 
     try:
         # 执行命令
@@ -313,19 +290,25 @@ if __name__ == "__main__":
         print(f"Unexpected error: {e}", file=sys.stderr)
         sys.exit(1)
 
-# 在Python代码中导入并调用（推荐用于复杂场景）：
+# 在 Python 代码中导入并调用（推荐用于复杂场景）：
+
 # from execute_unity_command import execute_command
+
 # result = execute_command({"batchId":"batch_001","commands":[...]})
-```
 
-### 4.4 路径替换逻辑
+````
 
-生成 Python 脚本时，需要将占位符 `{AGENT_COMMANDS_DATA_DIR}` 替换为实际的 AgentCommands 目录路径：
+### 4.4 路径注入逻辑
 
-```csharp
-string agentCommandsDir = "F:/UnityProject/SL/SL_402/Code/Assets/AgentCommands";
-string pythonScriptContent = SkillConfigsRegistry.PythonScriptTemplate;
-string replacedContent = pythonScriptContent.Replace("{AGENT_COMMANDS_DATA_DIR}", agentCommandsDir);
+生成 Python 脚本时,需要将 UnityAgentSkills 数据目录的绝对路径注入到脚本中,用于拼接 pending/results/done 等子目录:
+
+- 示例路径: `F:/UnityProject/SL/SL_402/Code/Assets/UnityAgentSkills`.
+
+```text
+UNITY_AGENT_SKILLS_DATA_DIR = "<UnityAgentSkills Data Dir Absolute Path>"
+PENDING_DIR = join(UNITY_AGENT_SKILLS_DATA_DIR, "pending")
+RESULTS_DIR = join(UNITY_AGENT_SKILLS_DATA_DIR, "results")
+DONE_DIR = join(UNITY_AGENT_SKILLS_DATA_DIR, "done")
 ```
 
 ## 5. 举例覆盖需求和边缘情况
@@ -339,10 +322,10 @@ string replacedContent = pythonScriptContent.Replace("{AGENT_COMMANDS_DATA_DIR}"
 1. 用户点击 `Tools/Unity-skills` 菜单项
 2. 弹窗显示，导出路径显示为空或默认值
 3. 用户点击「修改按钮」，选择路径 `C:/Users/xxx/.snow/skills`
-4. 用户点击「全选」按钮，选中所有技能（共 2 个：unity-log-query, unity-prefab-view）
+4. 用户点击「全选」按钮，选中所有技能（共 3 个：unity-log, unity-prefab-view, unity-k3-prefab）
 5. 用户点击「导出选中技能」按钮
 6. 插件创建 `C:/Users/xxx/.snow/skills/skills/` 文件夹
-7. 插件生成 `unity-log-query/` 文件夹，包含：
+7. 插件生成 `unity-log/` 文件夹，包含：
    - `SKILL.md` - 完整的技能说明文档
    - `scripts/execute_unity_command.py` - Python 脚本（已替换路径）
 8. 插件生成 `unity-prefab-view/` 文件夹，包含：
@@ -355,11 +338,15 @@ string replacedContent = pythonScriptContent.Replace("{AGENT_COMMANDS_DATA_DIR}"
 ```
 C:/Users/xxx/.snow/skills/
 └── skills/
-    ├── unity-log-query/
+    ├── unity-log/
     │   ├── SKILL.md
     │   └── scripts/
     │       └── execute_unity_command.py
-    └── unity-prefab-view/
+    ├── unity-prefab-view/
+    │   ├── SKILL.md
+    │   └── scripts/
+    │       └── execute_unity_command.py
+    └── unity-k3-prefab/
         ├── SKILL.md
         └── scripts/
             └── execute_unity_command.py
@@ -374,9 +361,9 @@ C:/Users/xxx/.snow/skills/
 1. 用户点击 `Tools/Unity-skills` 菜单项
 2. 弹窗显示，导出路径已保存为 `C:/Users/xxx/.snow/skills`
 3. 用户取消勾选 `unity-prefab-view`
-4. 用户只保留 `unity-log-query` 的勾选
+4. 用户只保留 `unity-log` 的勾选
 5. 用户点击「导出选中技能」按钮
-6. 插件只生成 `unity-log-query/` 文件夹
+6. 插件只生成 `unity-log/` 文件夹
 
 ### 例 3：覆盖已存在的技能文件夹
 
@@ -387,7 +374,7 @@ C:/Users/xxx/.snow/skills/
 ```
 C:/Users/xxx/.snow/skills/
 └── skills/
-    └── unity-log-query/
+    └── unity-log/
         ├── SKILL.md (旧版本)
         └── scripts/
             └── execute_unity_command.py (旧版本)
@@ -395,9 +382,9 @@ C:/Users/xxx/.snow/skills/
 
 **操作步骤**：
 
-1. 用户选中 `unity-log-query` 技能
+1. 用户选中 `unity-log` 技能
 2. 用户点击「导出选中技能」按钮
-3. 插件检测到 `C:/Users/xxx/.snow/skills/skills/unity-log-query/` 已存在
+3. 插件检测到 `C:/Users/xxx/.snow/skills/skills/unity-log/` 已存在
 4. 插件直接覆盖该文件夹，不提示警告
 5. 新的 `SKILL.md` 和 Python 脚本替换旧文件
 
@@ -423,7 +410,7 @@ C:/Users/xxx/.snow/skills/
 
 ```bash
 # 方式1: 直接在命令行中传入JSON字符串
-python C:/Users/xxx/.snow/skills/skills/unity-log-query/scripts/execute_unity_command.py '{"batchId":"batch_log_001","timeout":30000,"commands":[{"id":"cmd_001","type":"log.query","params":{"n":50,"level":"Error"}}]}'
+python C:/Users/xxx/.snow/skills/skills/unity-log/scripts/execute_unity_command.py '{"batchId":"batch_log_001","timeout":30000,"commands":[{"id":"cmd_001","type":"log.query","params":{"n":50,"level":"Error"}}]}'
 
 # 方式2: 使用JSON变量
 set JSON_INPUT='{"batchId":"batch_prefab_001","timeout":30000,"commands":[{"id":"cmd_001","type":"prefab.queryHierarchy","params":{"prefabPath":"Assets/Resources/Prefabs/DialogMain.prefab","includeInactive":true}}]}'
@@ -436,8 +423,8 @@ python C:/Users/xxx/.snow/skills/skills/unity-prefab-view/scripts/execute_unity_
 {
   "batchId": "batch_log_001",
   "status": "completed",
-  "startedAt": "2026-01-30T02:15:00Z",
-  "finishedAt": "2026-01-30T02:15:02Z",
+  "startedAt": "YYYY-MM-DD HH:mm:ss.SSS",
+  "finishedAt": "YYYY-MM-DD HH:mm:ss.SSS",
   "results": [
     {
       "id": "cmd_001",
@@ -504,15 +491,15 @@ except ValueError as e:
 
 **操作步骤**：
 
-1. 在 `Assets/Editor/AgentCommands/SkillConfigs/` 目录下新建 `SkillConfig_ConfigView.cs`
+1. 在 `Assets/Editor/UnityAgentSkills/SkillConfigs/` 目录下新建 `SkillConfig_UnityConfigView.cs`
 2. 编写配置文件内容，包含 SkillName, SkillDescription, SkillMarkdown
 3. 在 `SkillConfigsRegistry.cs` 的 `AllSkills` 字典中添加配置：
    ```csharp
-   { SkillConfig_ConfigView.SkillName, new SkillConfig
+   { SkillConfig_UnityConfigView.SkillName, new SkillConfig
        {
-           Name = SkillConfig_ConfigView.SkillName,
-           Description = SkillConfig_ConfigView.SkillDescription,
-           Markdown = SkillConfig_ConfigView.SkillMarkdown
+           Name = SkillConfig_UnityConfigView.SkillName,
+           Description = SkillConfig_UnityConfigView.SkillDescription,
+           Markdown = SkillConfig_UnityConfigView.SkillMarkdown
        }
    }
    ```
@@ -599,11 +586,11 @@ D:/Dev/snow-skills/
    ```
    D:/Dev/snow-skills/
    └── skills/
-       ├── unity-log-query/
-       │   ├── SKILL.md
-       │   └── scripts/
-       │       └── execute_unity_command.py
-       └── unity-prefab-view/
+    ├── unity-log/
+    │   ├── SKILL.md
+    │   └── scripts/
+    │       └── execute_unity_command.py
+    └── unity-prefab-view/
            ├── SKILL.md
            └── scripts/
                └── execute_unity_command.py
@@ -626,10 +613,10 @@ D:/Dev/snow-skills/
 
 ### 6.1 目录结构
 
-**新增的插件文件结构** (已实现轻量化架构):
+**新增的插件文件结构**:
 
 ```
-Code/Assets/Editor/AgentCommands/
+Code/Assets/Editor/UnityAgentSkills/
 ├── UI/                                      # 【新增】轻量化UI架构
 │   ├── SkillsExporterWindow.cs              # 主窗口（使用TabContentManager管理tabs）
 │   ├── Components/
@@ -642,9 +629,9 @@ Code/Assets/Editor/AgentCommands/
 │   ├── SkillsExporterMenuItem.cs            # 菜单项（向后兼容）
 │   └── SkillConfigs/
 │       ├── SkillConfigsRegistry.cs          # 集中配置
-│       ├── SkillConfig_LogQuery.cs          # 日志查询技能配置
-│       ├── SkillConfig_PrefabView.cs        # 预制体查看技能配置
-│       ├── SkillConfig_K3Prefab.cs          # K3预制体技能配置
+│       ├── SkillConfig_UnityLog.cs          # 日志技能配置(含查询与截图)
+│       ├── SkillConfig_UnityPrefabView.cs   # 预制体查看技能配置
+│       ├── SkillConfig_UnityK3Prefab.cs     # K3预制体技能配置
 │       └── PythonScriptTemplate.cs          # Python脚本模板
 └── (现有的其他文件...)
 ```
@@ -668,7 +655,7 @@ Code/Assets/Editor/AgentCommands/
 
 ### 7.1 新增技能的步骤
 
-1. 在 `Assets/Editor/AgentCommands/SkillConfigs/` 下创建新的配置文件
+1. 在 `Assets/Editor/UnityAgentSkills/SkillConfigs/` 下创建新的配置文件
 2. 在配置文件中定义 SkillName, SkillDescription, SkillMarkdown
 3. 在 `SkillConfigsRegistry.cs` 中注册新技能
 4. 重启 Unity 编辑器或等待脚本重载
@@ -685,5 +672,4 @@ Code/Assets/Editor/AgentCommands/
 - 不支持 Python 脚本的复杂校验和错误处理（保持简单）
 - 不支持技能之间的依赖关系管理
 - 不支持技能版本控制（直接覆盖同名文件）
-
-====================================已完成=============================
+````

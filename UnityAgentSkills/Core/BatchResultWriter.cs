@@ -188,6 +188,17 @@ namespace UnityAgentSkills.Core
             for (int i = 0; i < toDelete; i++)
             {
                 string resultPath = finals[i];
+
+                // 先清理该 results JSON 关联的截图产物(若有).
+                try
+                {
+                    CleanupScreenshotArtifactsFromResultJson(resultPath);
+                }
+                catch
+                {
+                    // 忽略清理截图失败,不得影响 results 清理流程.
+                }
+
                 try
                 {
                     File.Delete(resultPath);
@@ -208,6 +219,113 @@ namespace UnityAgentSkills.Core
                     // 忽略删除失败的归档文件
                 }
             }
+        }
+
+        /// <summary>
+        /// 解析将要删除的 results JSON,并精准清理其中 log.screenshot 返回的产物路径.
+        /// </summary>
+        private static void CleanupScreenshotArtifactsFromResultJson(string resultsJsonPath)
+        {
+            if (string.IsNullOrEmpty(resultsJsonPath) || !File.Exists(resultsJsonPath)) return;
+
+            string text;
+            try
+            {
+                text = File.ReadAllText(resultsJsonPath);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(text)) return;
+
+            JsonData root;
+            try
+            {
+                root = JsonMapper.ToObject(text);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (root == null || !root.IsObject || !root.ContainsKey("results")) return;
+            JsonData results = root["results"];
+            if (results == null || !results.IsArray) return;
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                JsonData cmd = results[i];
+                if (cmd == null || !cmd.IsObject) continue;
+
+                if (!cmd.ContainsKey("type") || !string.Equals(cmd["type"].ToString(), "log.screenshot", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!cmd.ContainsKey("status") || cmd["status"].ToString() != UnityAgentSkillCommandStatuses.Success) continue;
+                if (!cmd.ContainsKey("result")) continue;
+
+                JsonData result = cmd["result"];
+                if (result == null || !result.IsObject) continue;
+
+                // single
+                if (result.ContainsKey("imageAbsolutePath"))
+                {
+                    TryDeleteScreenshotPath(result["imageAbsolutePath"].ToString());
+                }
+            }
+        }
+
+        private static void TryDeleteScreenshotPath(string absolutePath)
+        {
+            if (string.IsNullOrEmpty(absolutePath)) return;
+
+            // 安全边界: 仅允许删除 results 目录下路径.
+            string resultsRoot = UnityAgentSkillsConfig.ResultsDirAbsolutePath;
+            if (string.IsNullOrEmpty(resultsRoot)) return;
+
+            string fullRoot;
+            string fullTarget;
+            try
+            {
+                fullRoot = Path.GetFullPath(resultsRoot);
+                fullTarget = Path.GetFullPath(absolutePath);
+            }
+            catch
+            {
+                return;
+            }
+
+            if (!IsUnderDirectory(fullTarget, fullRoot)) return;
+
+            try
+            {
+                if (Directory.Exists(fullTarget))
+                {
+                    Directory.Delete(fullTarget, true);
+                    return;
+                }
+
+                if (File.Exists(fullTarget))
+                {
+                    File.Delete(fullTarget);
+                }
+            }
+            catch
+            {
+                // 忽略删除失败.
+            }
+        }
+
+        private static bool IsUnderDirectory(string path, string directory)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(directory)) return false;
+
+            string dir = directory;
+            if (!dir.EndsWith(Path.DirectorySeparatorChar.ToString()) && !dir.EndsWith(Path.AltDirectorySeparatorChar.ToString()))
+            {
+                dir += Path.DirectorySeparatorChar;
+            }
+
+            return path.StartsWith(dir, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

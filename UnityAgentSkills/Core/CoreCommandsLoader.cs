@@ -4,7 +4,7 @@ namespace UnityAgentSkills.Core
 {
     /// <summary>
     /// 核心命令加载器.
-    /// 硬编码注册内置命令(log.query).
+    /// 硬编码注册内置命令(log.*).
     /// 不使用反射,确保内置命令永不失败.
     /// </summary>
     public static class CoreCommandsLoader
@@ -17,9 +17,10 @@ namespace UnityAgentSkills.Core
         public static void RegisterCoreCommands(CommandHandlerRegistry registry)
         {
             // 优先级0: 内置命令,最高优先级
-            // log.query 是唯一内置命令,不使用反射加载
+            // 当前内置命令至少包含: log.query, log.screenshot
 
             registry.Register("log.query", LogQueryCommandHandler.Execute, priority: 0);
+            registry.Register("log.screenshot", LogScreenshotCommandHandler.Execute, priority: 0);
         }
     }
 }

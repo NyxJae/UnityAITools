@@ -3,7 +3,7 @@ namespace UnityAgentSkills.SkillsExporter
     /// <summary>
     /// unity-prefab-view技能配置.
     /// </summary>
-    public static class SkillConfig_PrefabView
+    public static class SkillConfig_UnityPrefabView
     {
         /// <summary>
         /// 技能名称.

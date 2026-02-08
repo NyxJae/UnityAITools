@@ -34,25 +34,25 @@ namespace UnityAgentSkills.SkillsExporter
         {
             AllSkills = new Dictionary<string, SkillConfig>
             {
-                { SkillConfig_LogQuery.SkillName, new SkillConfig
+                { SkillConfig_UnityLog.SkillName, new SkillConfig
                     {
-                        Name = SkillConfig_LogQuery.SkillName,
-                        Description = SkillConfig_LogQuery.SkillDescription,
-                        Markdown = SkillConfig_LogQuery.SkillMarkdown
+                        Name = SkillConfig_UnityLog.SkillName,
+                        Description = SkillConfig_UnityLog.SkillDescription,
+                        Markdown = SkillConfig_UnityLog.SkillMarkdown
                     }
                 },
-                { SkillConfig_PrefabView.SkillName, new SkillConfig
+                { SkillConfig_UnityPrefabView.SkillName, new SkillConfig
                     {
-                        Name = SkillConfig_PrefabView.SkillName,
-                        Description = SkillConfig_PrefabView.SkillDescription,
-                        Markdown = SkillConfig_PrefabView.SkillMarkdown
+                        Name = SkillConfig_UnityPrefabView.SkillName,
+                        Description = SkillConfig_UnityPrefabView.SkillDescription,
+                        Markdown = SkillConfig_UnityPrefabView.SkillMarkdown
                     }
                 },
-                { SkillConfig_K3Prefab.SkillName, new SkillConfig
+                { SkillConfig_UnityK3Prefab.SkillName, new SkillConfig
                     {
-                        Name = SkillConfig_K3Prefab.SkillName,
-                        Description = SkillConfig_K3Prefab.SkillDescription,
-                        Markdown = SkillConfig_K3Prefab.SkillMarkdown
+                        Name = SkillConfig_UnityK3Prefab.SkillName,
+                        Description = SkillConfig_UnityK3Prefab.SkillDescription,
+                        Markdown = SkillConfig_UnityK3Prefab.SkillMarkdown
                     }
                 }
             };

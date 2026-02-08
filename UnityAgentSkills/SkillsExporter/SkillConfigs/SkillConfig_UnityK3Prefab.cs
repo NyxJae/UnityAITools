@@ -3,7 +3,7 @@ namespace UnityAgentSkills.SkillsExporter
     /// <summary>
     /// unity-k3-prefab技能配置.
     /// </summary>
-    public static class SkillConfig_K3Prefab
+    public static class SkillConfig_UnityK3Prefab
     {
         /// <summary>
         /// 技能名称.

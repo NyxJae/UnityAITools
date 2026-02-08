@@ -12,13 +12,11 @@
 - 通过 EditorApplication.update 轮询检测焦点状态
 - 配置使用 ScriptableObject (AutoCompileConfig.asset)
 
-**目标项目** (`Code/Assets/Editor/AgentCommands`):
+**目标项目** (`Code/Assets/Editor/UnityAgentSkills`):
 
 - 插件化命令执行框架
 - 有 SkillsExporterWindow 窗口（菜单：Tools/Unity-skills）
 - 当前为单页面窗口，只支持技能导出功能
-
-**实施状态**: ✅ 已完成融合（2026-02-02）
 
 ### 1.2 问题
 
@@ -26,11 +24,11 @@
 
 ### 1.3 核心目标
 
-将 AutoCompileOnOutOfFocus 的核心功能融合进 AgentCommands 项目：
+将 AutoCompileOnOutOfFocus 的核心功能融合进 UnityAgentSkills 项目:
 
-- ✅ **作为后台服务自动运行**：使用 `[InitializeOnLoad]` 在编辑器启动时自动初始化服务
-- ✅ **集成配置界面**：在 SkillsExporterWindow 中添加新的 tab 页，提供 AutoCompile 配置选项
-- ✅ **保持原有功能**：完全保留 AutoCompileOnOutOfFocus 的核心能力（焦点外自动编译）
+- **作为后台服务自动运行**: 使用 `[InitializeOnLoad]` 在编辑器启动时自动初始化服务.
+- **集成配置界面**: 在 SkillsExporterWindow 中添加新的 tab 页,提供 AutoCompile 配置选项.
+- **保持原有功能**: 保留 AutoCompileOnOutOfFocus 的核心能力(焦点外自动编译).
 
 ---
 
@@ -38,13 +36,13 @@
 
 ### 2.1 功能点
 
-- [x] **后台服务集成** ✅ 已完成
+- [ ] **后台服务集成**
 
   - 使用 `[InitializeOnLoad]` 自动初始化 (AutoCompileService)
   - Unity 编辑器启动时根据配置自动启动服务
   - 不再实现 ICommandPlugin 接口（改为独立服务模式）
 
-- [x] **配置界面（新增 tab 页）** ✅ 已完成
+- [ ] **配置界面（新增 tab 页）**
 
   - SkillsExporterWindow 重构为 tab 结构
   - Tab 1：技能导出（现有功能）
@@ -55,7 +53,7 @@
     - **监听路径列表**（支持多个路径，可添加/删除/浏览）
     - 当前状态显示（Running/Paused/Compiling/Pending）
 
-- [x] **核心功能保留** ✅ 已完成
+- [ ] **核心功能保留**
 
   - 文件监听服务（FileSystemWatcher 监听 .cs 文件）
   - 焦点检测（InternalEditorUtility.isApplicationActive）
@@ -64,17 +62,16 @@
   - 自动触发编译（AssetDatabase.Refresh()）
   - **Play 模式兼容**（进入 Play 暂停服务，退出 Play 恢复服务）
 
-- [x] **配置持久化** ✅ 已完成
+- [ ] **配置持久化**
+
   - 使用 EditorPrefs 存储配置
-  - Key 格式：`AgentCommands.AutoCompile.{项目路径}`
-  - JSON 序列化存储
+  - Key 格式: `UnityAgentSkills.AutoCompile.{项目路径}`
 
 ### 2.2 排除项
 
 - **不提供外部命令接口**：不需要 compile.trigger 等命令，仅作为后台服务
 - **不保留原窗口**：配置界面集成到 SkillsExporterWindow
 - **不改变核心逻辑**：保持原有的焦点检测和防抖逻辑不变
-- ~~**暂不支持多路径监听**：只监听单个路径（默认 Assets）~~ → **✅ 已支持多路径监听**
 
 ---
 
@@ -296,8 +293,8 @@
    - 监听路径：Assets
 2. 配置保存到 EditorPrefs：
    ```
-   Key: AgentCommands.AutoCompile.F:/UnityProject/SL/SL_402
-   Value: {"enabled":true,"debounceInterval":1000,"watchPath":"Assets"}
+   Key: UnityAgentSkills.AutoCompile.F:/UnityProject/SL/SL_402
+   Value: {"enabled":true,"debounceInterval":1000,"watchPaths":["Assets"]}
    ```
 3. 用户关闭 Unity 编辑器
 4. 重新打开 Unity 项目
@@ -350,7 +347,7 @@
 4. 检测到路径不存在
 5. 在配置界面显示错误提示：
    ```
-   ⚠️ 监听路径不存在: Assets/NonExistent
+   注意: 监听路径不存在: Assets/NonExistent
    ```
 6. 服务不启动，状态保持"Stopped"
 
@@ -368,12 +365,12 @@
 
 **项目 A** (`F:/ProjectA`):
 
-- EditorPrefs Key: `AgentCommands.AutoCompile.F:/ProjectA`
+- EditorPrefs Key: `UnityAgentSkills.AutoCompile.F:/ProjectA`
 - 配置：启用，500ms
 
 **项目 B** (`D:/Games/ProjectB`):
 
-- EditorPrefs Key: `AgentCommands.AutoCompile.D:/Games/ProjectB`
+- EditorPrefs Key: `UnityAgentSkills.AutoCompile.D:/Games/ProjectB`
 - 配置：禁用，1000ms
 
 **操作步骤**：
@@ -394,52 +391,33 @@
 
 ## 4. 目录结构与文件清单
 
-### 4.1 新增文件（✅ 已完成）
+### 4.1 新增文件
 
 ```
-Code/Assets/Editor/AgentCommands/
-├── AutoCompile/                              # ✅ 已创建
-│   ├── AutoCompileService.cs                # ✅ 服务启动器（使用 [InitializeOnLoad]）
+Code/Assets/Editor/UnityAgentSkills/
+├── AutoCompile/
+│   ├── AutoCompileService.cs                # 服务启动器(使用 [InitializeOnLoad])
 │   ├── Core/
-│   │   ├── AutoCompileController.cs          # ✅ 核心控制器（状态机、事件处理）
-│   │   └── FileMonitorService.cs             # ✅ 文件监听服务（FileSystemWatcher）
+│   │   ├── AutoCompileController.cs          # 核心控制器(状态机,事件处理)
+│   │   └── FileMonitorService.cs             # 文件监听服务(FileSystemWatcher)
 │   └── Configuration/
-│       ├── AutoCompileConfig.cs              # ✅ 配置数据模型
-│       └── AutoCompileConfigProvider.cs      # ✅ EditorPrefs 读写工具
+│       ├── AutoCompileConfig.cs              # 配置数据模型
+│       └── AutoCompileConfigProvider.cs      # EditorPrefs 读写工具
 │
-└── UI/                                      # ✅ 【新增】轻量化UI架构
-    ├── SkillsExporterWindow.cs               # ✅ 主窗口（轻量化版本）
+└── UI/
+    ├── SkillsExporterWindow.cs               # 主窗口
     ├── Components/                           # UI组件
-    │   ├── ITabContent.cs                    # ✅ Tab内容接口
-    │   └── TabContentManager.cs              # ✅ Tab管理器
+    │   ├── ITabContent.cs                    # Tab内容接口
+    │   └── TabContentManager.cs              # Tab管理器
     └── Tabs/                                 # 各个Tab页面
-        ├── SkillsExportTab.cs                # ✅ 技能导出Tab
-        └── AutoCompileTab.cs                 # ✅ AutoCompile配置Tab
+        ├── SkillsExportTab.cs                # 技能导出Tab
+        └── AutoCompileTab.cs                 # AutoCompile配置Tab
 ```
 
-### 4.2 修改文件（✅ 已完成）
+### 4.2 修改文件
 
 - `SkillsExporter/SkillsExporterMenuItem.cs`：移除 MenuItem 特性，保留用于向后兼容
 - ~~`SkillsExporter/SkillsExporterWindow.cs`~~：已删除，迁移至 `UI/SkillsExporterWindow.cs`
-
-### 4.3 实际实现与原计划差异
-
-**架构调整**:
-
-- ❌ ~~AutoCompilePlugin (ICommandPlugin)~~ → ✅ AutoCompileService ([InitializeOnLoad])
-- 原计划作为插件运行，改为独立的后台服务模式
-
-**配置改进**:
-
-- ✅ 支持多路径监听（原计划只支持单个路径）
-- ✅ WatchPath 改为 WatchPaths (List<string>)
-
-**UI 增强**:
-
-- ✅ 支持添加/删除/浏览多个监听路径
-- ✅ 路径验证和错误提示
-
----
 
 ## 5. UI 界面设计
 
@@ -455,7 +433,7 @@ Code/Assets/Editor/AgentCommands/
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 AutoCompile 配置 tab（✅ 已实现）
+### 5.2 AutoCompile 配置 tab
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -487,13 +465,13 @@ Code/Assets/Editor/AgentCommands/
 
 ---
 
-## 6. 技术实现要点（✅ 已完成）
+## 6. 技术实现要点
 
-### 6.1 AutoCompileService 服务结构 ✅ 已实现
+### 6.1 AutoCompileService 服务结构
 
 ```csharp
-namespace AgentCommands.AutoCompile
-{
+namespace UnityAgentSkills.AutoCompile
+
     [InitializeOnLoad]
     public class AutoCompileService
     {
@@ -517,13 +495,7 @@ namespace AgentCommands.AutoCompile
 }
 ```
 
-**与原计划差异**:
-
-- ❌ ~~不实现 ICommandPlugin 接口~~ → ✅ 使用 `[InitializeOnLoad]` 特性
-- ✅ Unity 编辑器启动时自动初始化
-- ✅ 提供 `Restart()` 方法用于配置更改后重启服务
-
-### 6.2 配置模型 ✅ 已实现（支持多路径）
+### 6.2 配置模型
 
 ```csharp
 public class AutoCompileConfig
@@ -534,11 +506,6 @@ public class AutoCompileConfig
 }
 ```
 
-**改进**:
-
-- ✅ WatchPath 改为 WatchPaths (List<string>)
-- ✅ 支持监听多个路径
-
 ### 6.3 EditorPrefs 存储
 
 ```csharp
@@ -547,7 +514,7 @@ internal static class AutoCompileConfigProvider
     private static string GetEditorPrefsKey()
     {
         string projectPath = Directory.GetParent(Application.dataPath).FullName;
-        return $"AgentCommands.AutoCompile.{projectPath}";
+        return $"UnityAgentSkills.AutoCompile.{projectPath}";
     }
 
     public static AutoCompileConfig LoadConfig()
@@ -638,7 +605,7 @@ public class SkillsExporterWindow : EditorWindow
 
 确保 AutoCompile 相关文件引用正确的程序集定义：
 
-- 如果使用 `AgentCommands.asmdef`，无需额外配置
+- 如果使用 `UnityAgentSkills.asmdef`,无需额外配置
 - 如果独立程序集，需要在 `.asmdef` 中引用 `UnityEditor`
 
 ---
@@ -691,11 +658,10 @@ SkillsExporterWindow 的 tab 结构可以轻松扩展：
 
 ## 10. 不包含的功能
 
-- ✅ **不提供命令接口**：不需要 compile.trigger 等外部命令（已确认）
-- ✅ **不保留原 AutoCompileWindow**：配置界面集成到 SkillsExporterWindow（已完成）
-- ~~**不支持多路径监听**：只监听单个目录~~ → **✅ 已支持多路径监听**（超出原计划）
-- ✅ **不支持自定义编译触发条件**：固定为"失去焦点时触发"（已确认）
-- ✅ **不修改核心编译逻辑**：使用 AssetDatabase.Refresh()，不自定义编译流程（已确认）
+- [ ] **不提供命令接口**:不需要 compile.trigger 等外部命令,仅作为后台服务.
+- [ ] **不保留原 AutoCompileWindow**:配置界面集成到 SkillsExporterWindow.
+- [ ] **不支持自定义编译触发条件**:固定为"失去焦点时触发".
+- [ ] **不修改核心编译逻辑**:使用 AssetDatabase.Refresh(),不自定义编译流程.
 
 ---
 
@@ -703,75 +669,21 @@ SkillsExporterWindow 的 tab 结构可以轻松扩展：
 
 ### 11.1 功能完整性
 
-- ✅ AutoCompile 功能完全融入 AgentCommands 项目
-- ✅ 作为后台服务自动运行
-- ✅ 配置界面友好易用
-- ✅ 配置持久化正确
+- [ ] AutoCompile 功能作为 UnityAgentSkills 的一部分自动运行.
+- [ ] 配置界面可用,配置项可读可写.
+- [ ] 配置持久化正确(重启编辑器后仍保持).
 
 ### 11.2 用户体验
 
-- ✅ 用户无需手动切换回 Unity 即可触发编译
-- ✅ 配置简单直观
-- ✅ 状态反馈及时
-- ✅ 错误提示友好
+- [ ] 用户无需手动切换回 Unity 即可触发编译.
+- [ ] 配置简单直观.
+- [ ] 状态反馈及时.
+- [ ] 错误提示友好.
 
 ### 11.3 代码质量
 
-- ✅ 不再依赖插件系统（改为独立服务）
-- ✅ 代码结构清晰，易于维护
-- ✅ 与原 AutoCompileOnOutOfFocus 代码风格一致
-- ✅ 充分利用 Unity Editor API
+- [ ] 不依赖 UnityAgentSkills 的反射插件系统(ICommandPlugin),以独立服务形式运行.
+- [ ] 代码结构清晰,易于维护.
+- [ ] 充分利用 Unity Editor API.
 
 ---
-
-## 12. 实施总结（2026-02-02）
-
-### 12.1 完成状态
-
-**✅ 全部完成**
-
-所有计划功能已实现，并超出原计划：
-
-- ✅ 支持多路径监听（原计划只支持单路径）
-- ✅ Play 模式兼容（原计划未提及）
-- ✅ 更简洁的架构（使用 [InitializeOnLoad] 而非插件模式）
-
-### 12.2 架构优化
-
-**从插件模式改为服务模式**:
-
-- 原计划: AutoCompilePlugin (ICommandPlugin)
-- 实际实现: AutoCompileService ([InitializeOnLoad])
-- 优势: 更简洁，无需依赖插件系统，Unity 启动时自动初始化
-
-### 12.3 功能增强
-
-**多路径监听支持**:
-
-- 原计划: WatchPath (单个路径)
-- 实际实现: WatchPaths (List<string>)
-- UI: 支持添加/删除/浏览多个路径
-- 实现: 每个路径独立的 FileMonitorService，共享同一个文件变更队列
-
-### 12.4 Bug 修复记录
-
-1. **GUI Layout 错误**: 修复 BeginHorizontal/EndHorizontal 不匹配问题
-2. **命名空间统一**: 从 AgentCommands.Plugins.AutoCompile 改为 AgentCommands.AutoCompile
-3. **目录位置调整**: 从 Plugins/AutoCompile/ 移至 AutoCompile/
-4. **浏览按钮 Bug**: 修复空路径无法弹出文件夹选择框问题
-
-### 12.5 待测试
-
-- [ ] 编译测试（等待用户触发 C# 编译）
-- [ ] 功能测试（等待用户验证自动编译功能）
-- [ ] 边界条件测试（Play 模式、多路径等）
-
----
-
-**文档版本**: 2.0
-**创建时间**: 2026-02-02
-**最后更新**: 2026-02-02
-**实施状态**: ✅ 已完成融合（超出原计划）
-**下一步**: 等待用户测试验证
-
-=========已完成============

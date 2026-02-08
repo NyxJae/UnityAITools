@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using LitJson2_utf;
+using UnityEngine;
 
 namespace UnityAgentSkills.Core
 {
@@ -36,6 +37,16 @@ namespace UnityAgentSkills.Core
 
             // 触发processing状态更新
             onProcessingUpdate?.Invoke(batchResult);
+
+            // 预计算本批次 screenshot 命令数量,用于命名冲突规则(baseName).
+            int screenshotCommandCount = 0;
+            for (int i = 0; i < batchCmd.commands.Count; i++)
+            {
+                if (string.Equals(batchCmd.commands[i].type, "log.screenshot", StringComparison.OrdinalIgnoreCase))
+                {
+                    screenshotCommandCount++;
+                }
+            }
 
             // 串行执行每个命令
             for (int i = 0; i < batchCmd.commands.Count; i++)
@@ -81,7 +92,13 @@ namespace UnityAgentSkills.Core
                 try
                 {
                     // 执行命令
-                    JsonData resultData = CommandHandlerRegistry.Instance.Execute(cmd.type, cmd.@params);
+                    JsonData effectiveParams = cmd.@params;
+                    if (string.Equals(cmd.type, "log.screenshot", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveParams = InjectScreenshotContext(effectiveParams, batchId, cmd.id, screenshotCommandCount);
+                    }
+
+                    JsonData resultData = CommandHandlerRegistry.Instance.Execute(cmd.type, effectiveParams);
 
                     // 检查命令是否超时(即使成功也要检查)
                     TimeSpan cmdElapsed = DateTime.Now - cmdStartTime;
@@ -110,6 +127,11 @@ namespace UnityAgentSkills.Core
                     if (cmdElapsed.TotalMilliseconds > cmdTimeout)
                     {
                         cmdResult.error = BuildTimeoutError(cmdElapsed, cmdTimeout);
+                    }
+                    // 处理业务侧主动抛出的 TIMEOUT(例如 log.screenshot 等待文件可读超时)
+                    else if (ex is ArgumentException && ex.Message != null && ex.Message.StartsWith(UnityAgentSkillCommandErrorCodes.Timeout + ":"))
+                    {
+                        cmdResult.error = CommandErrorFactory.CreateTimeoutError((int)cmdElapsed.TotalMilliseconds, cmdTimeout);
                     }
                     // 处理参数校验异常(ArgumentException)
                     else if (ex is ArgumentException && ex.Message != null && ex.Message.StartsWith(UnityAgentSkillCommandErrorCodes.InvalidFields + ":"))
@@ -192,6 +214,49 @@ namespace UnityAgentSkills.Core
         private static CommandError BuildTimeoutError(TimeSpan elapsed, int timeout)
         {
             return CommandErrorFactory.CreateTimeoutError((int)elapsed.TotalMilliseconds, timeout);
+        }
+
+        /// <summary>
+        /// 为 log.screenshot 注入执行上下文(不属于对外协议字段).
+        /// </summary>
+        private static JsonData InjectScreenshotContext(JsonData rawParams, string batchId, string cmdId, int screenshotCommandCount)
+        {
+            JsonData data = new JsonData();
+
+            // 深拷贝原始 params,避免注入字段污染输入对象(包括嵌套引用共享).
+            if (rawParams != null && rawParams.IsObject)
+            {
+                try
+                {
+                    data = JsonMapper.ToObject(rawParams.ToJson());
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[UnityAgentSkills] Deep clone screenshot params failed, fallback to shallow copy. " + ex.Message);
+
+                    // Deep clone 失败时,至少保留顶层业务字段,避免静默丢参导致行为漂移.
+                    data = new JsonData();
+                    try
+                    {
+                        foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)rawParams)
+                        {
+                            string key = entry.Key as string;
+                            if (string.IsNullOrEmpty(key)) continue;
+                            data[key] = (JsonData)entry.Value;
+                        }
+                    }
+                    catch (Exception ex2)
+                    {
+                        Debug.LogWarning("[UnityAgentSkills] Shallow copy screenshot params failed, fallback to empty object. " + ex2.Message);
+                        data = new JsonData();
+                    }
+                }
+            }
+
+            data["__batchId"] = batchId ?? "";
+            data["__cmdId"] = cmdId ?? "";
+            data["__screenshotCommandCount"] = screenshotCommandCount;
+            return data;
         }
     }
 }

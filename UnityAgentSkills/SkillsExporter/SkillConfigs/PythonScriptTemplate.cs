@@ -23,7 +23,6 @@ elif sys.platform.startswith('win'):
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
-# 占位符,生成时会被替换为实际路径,例如：F:/UnityProject/SL/SL_402/Code/Assets/UnityAgentSkills
 # 使用原始字符串r''避免Windows路径中的反斜杠被当作转义符
 AGENT_COMMANDS_DATA_DIR = r""{AGENT_COMMANDS_DATA_DIR}""
 PENDING_DIR = os.path.join(AGENT_COMMANDS_DATA_DIR, ""pending"")
@@ -59,10 +58,15 @@ def execute_command(input_json):
     if not batch_id:
         raise ValueError(""Missing required field: batchId"")
 
-    # 写入pending目录
+    # 写入pending目录(原子写: tmp -> replace),避免Unity读到半截JSON导致重试与队列阻塞.
+    os.makedirs(PENDING_DIR, exist_ok=True)
     pending_file = os.path.join(PENDING_DIR, f""{batch_id}.json"")
-    with open(pending_file, 'w', encoding='utf-8') as f:
+    tmp_file = pending_file + "".tmp""
+    with open(tmp_file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp_file, pending_file)
 
     # 轮询results目录
     start_time = time.time()
