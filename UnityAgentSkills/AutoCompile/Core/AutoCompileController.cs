@@ -215,17 +215,18 @@ namespace UnityAgentSkills.AutoCompile
             }
 
             // 从队列中处理文件变更事件,并启动或重置防抖计时器
-            if (!_changedFilesQueue.IsEmpty)
+        if (!_changedFilesQueue.IsEmpty)
+        {
+            // 清空队列
+            while (_changedFilesQueue.TryDequeue(out string _))
             {
-                // 清空队列
-                while (_changedFilesQueue.TryDequeue(out string _))
-                {
-                    // 只需要清空队列,不需要记录具体文件
-                }
-
-                SetStatus(Status.Pending);
-                _debounceEndTime = EditorApplication.timeSinceStartup + (_config.DebounceInterval / 1000.0);
+                // 只需要清空队列,不需要记录具体文件
             }
+
+            // 每次有新变更都重置防抖计时器,确保最后一次变更后才触发编译
+            SetStatus(Status.Pending);
+            _debounceEndTime = EditorApplication.timeSinceStartup + (_config.DebounceInterval / 1000.0);
+        }
 
             // 如果处于待定状态并且防抖时间已过
             if (CurrentStatus == Status.Pending && EditorApplication.timeSinceStartup >= _debounceEndTime)

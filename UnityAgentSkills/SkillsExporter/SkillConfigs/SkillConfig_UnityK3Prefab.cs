@@ -20,7 +20,7 @@ namespace UnityAgentSkills.SkillsExporter
         /// </summary>
         public const string SkillMarkdown = @"---
 name: unity-k3-prefab
-description: K3框架预制体查询与编辑工具. 触发关键词:Unity:K3预制体,Unity:K3 prefab,Unity:K3UI
+description: K3框架预制体查询与编辑工具. 触发关键词:Unity,K3预制体,K3 prefab,K3UI,UI
 ---
 
 # Unity K3 Prefab Editor
@@ -54,7 +54,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_k3
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径(必须以 ""Assets/"" 开头)
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `k3Id` 必填，K3 组件的 ID (uint 类型，与 Lua 代码中使用的 ID 一致)
 - `componentFilter` 可选，组件类型过滤数组，如 `[""K3Button""]`，null 表示返回所有类型
 
@@ -116,7 +116,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_k3
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径
 - `k3Id` 必填，K3 组件的 ID
 - `index` 可选，同 K3ID 中的索引（用于精确定位），默认为 0
 - `modifications` 必填，修改请求数组，每个元素包含:
@@ -124,50 +124,13 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_k3
   - `oldValue` 期望的旧值（用于验证）
   - `newValue` 要修改的新值
 
-**返回结果示例**:
+**关键返回字段说明**:
 
-```json
-{
-  ""batchId"": ""batch_k3_modify_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_001"",
-      ""type"": ""k3prefab.setComponentProperties"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""k3Id"": 6,
-        ""index"": 0,
-        ""gameObjectPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""componentType"": ""K3Button"",
-        ""modifications"": [
-          {
-            ""property"": ""alpha"",
-            ""oldValue"": 1.0,
-            ""currentValue"": 1.0,
-            ""newValue"": 0.5,
-            ""status"": ""success"",
-            ""message"": ""属性修改成功""
-          }
-        ],
-        ""currentProperties"": {
-          ""interactable"": false,
-          ""alpha"": 0.5,
-          ""ID"": 6
-        },
-        ""saved"": true,
-        ""summary"": {
-          ""total"": 2,
-          ""success"": 2,
-          ""skipped"": 0,
-          ""failed"": 0
-        }
-      }
-    }
-  ]
-}
-```
+- `modifications[]`: 每个属性的修改结果,包含 `property`,`oldValue`,`currentValue`,`newValue`,`status`(success/skipped/failed),`message`
+- `currentProperties`: 修改后的当前属性快照
+- `saved`: 预制体是否成功保存
+- `summary`: 修改统计(`total`,`success`,`skipped`,`failed`)
+- 乐观锁: 每个属性独立验证 oldValue,不匹配则 status=skipped
 
 ---
 
@@ -183,7 +146,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""_batch_g
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径
 - `objectPath` 必填，GameObject 层级路径 (从 k3prefab.queryByK3Id 返回的 gameObjectPath 获取)
 - `siblingIndex` 可选，同名对象索引，默认为 0
 - `properties` 必填，要修改的属性对象，支持的字段:
@@ -194,44 +157,15 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""_batch_g
   - `isStatic` (bool) 静态标记
   - `hideFlags` (int) 隐藏标志
 
-**返回结果示例**:
+**关键返回字段说明**:
 
-```json
-{
-  ""batchId"": ""batch_goprops_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_001"",
-      ""type"": ""prefab.setGameObjectProperties"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""objectPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""instanceID"": 345678901,
-        ""modifiedProperties"": [
-          {
-            ""name"": ""name"",
-            ""oldValue"": ""K3Button_Confirm"",
-            ""newValue"": ""K3Button_Confirm_New""
-          }
-        ],
-        ""currentProperties"": {
-          ""name"": ""K3Button_Confirm_New"",
-          ""tag"": ""Untagged"",
-          ""layer"": 5,
-          ""isActive"": true
-        },
-        ""saved"": true
-      }
-    }
-  ]
-}
-```
+- `modifiedProperties[]`: 每个属性的修改详情,包含 `name`,`oldValue`,`newValue`
+- `currentProperties`: 修改后的 GameObject 属性快照
+- `saved`: 预制体是否成功保存
 
 ---
 
-## 命令 3: k3prefab.createComponent (创建K3UI组件)
+## 命令 4: k3prefab.createComponent (创建K3UI组件)
 
 在预制体中创建新的 K3UI 组件（K3Button、K3Label、K3Image 等），自动分配 K3ID 并设置初始属性。
 
@@ -243,7 +177,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_cr
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径(必须以 ""Assets/"" 开头)
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `parentPath` 必填，父节点路径(必须是实现 IK3Container 的节点，如 K3Dialog、K3Panel)
 - `componentType` 必填，K3UI 组件类型名(支持: K3Button, K3Label, K3Image, K3Edit, K3CheckBox, K3Panel, K3ListView 等 20+ 种类型)
 - `initialProperties` 可选，组件初始属性对象，不同组件类型支持不同的属性
@@ -252,57 +186,15 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_cr
 
 K3Button, K3Label, K3Image, K3Edit, K3CheckBox, K3LinkLabel, K3Panel, K3ListView, K3Dialog, K3Dialog2, K3TabButton, K3Tab, K3ProgressBar, K3RadarChart, K3HeadIcon, K3Itembox, K3LabelButton, K3Animation, K3SliderBar, K3Movie, K3NumImage, K3JoyStick, K3Magicbox, K3ExpandListView, K3ExpandListPanel, K3InsightImage
 
-**返回结果示例**:
+**关键返回字段说明**:
 
-```json
-{
-  ""batchId"": ""batch_create_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_create_button"",
-      ""type"": ""k3prefab.createComponent"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""parentPath"": ""DialogMain/Panel_Content"",
-        ""componentType"": ""K3Button"",
-        ""gameObject"": {
-          ""name"": ""K3Button_6"",
-          ""path"": ""DialogMain/Panel_Content/K3Button_6"",
-          ""instanceID"": 123456789
-        },
-        ""k3Component"": {
-          ""type"": ""K3Button"",
-          ""properties"": {
-            ""ID"": 6,
-            ""parentID"": 3,
-            ""interactable"": true,
-            ""alpha"": 1.0
-          }
-        },
-        ""saved"": true
-      }
-    }
-  ]
-}
-```
-
-**批量创建示例** - 创建多个组件:
-
-```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_create_multiple"",""timeout"":30000,""commands"":[{""id"":""cmd_create_button"",""type"":""k3prefab.createComponent"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""parentPath"":""DialogMain/Panel_Content"",""componentType"":""K3Button""}},{""id"":""cmd_create_label"",""type"":""k3prefab.createComponent"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""parentPath"":""DialogMain/Panel_Content"",""componentType"":""K3Label"",""initialProperties"":{""text"":""确认"",""fontSize"":22}}}]}'
-```
-
-**创建带初始属性的标签**:
-
-```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_create_label"",""timeout"":30000,""commands"":[{""id"":""cmd_create_label"",""type"":""k3prefab.createComponent"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""parentPath"":""DialogMain/Panel_Content"",""componentType"":""K3Label"",""initialProperties"":{""text"":""Hello World"",""fontSize"":22,""color"":""NormalBai""}}}]}'
-```
+- `gameObject`: 创建的 GameObject 信息(`name`,`path`,`instanceID`)
+- `k3Component`: K3 组件信息(`type`,`properties` 含自动分配的 `ID`,`parentID`)
+- `saved`: 预制体是否成功保存
 
 ---
 
-## 命令 4: prefab.deleteGameObject (删除GameObject)
+## 命令 5: prefab.deleteGameObject (删除GameObject)
 
 删除预制体中指定的 GameObject（级联删除所有子物体），支持通过 objectPath 和 siblingIndex 精确定位。
 
@@ -314,64 +206,22 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_de
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径(必须以 ""Assets/"" 开头)
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `objectPath` 必填，GameObject 层级路径
 - `siblingIndex` 可选，同名对象索引，默认为 0
 
-**返回结果示例**:
-
-```json
-{
-  ""batchId"": ""batch_delete_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_delete"",
-      ""type"": ""prefab.deleteGameObject"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""deletedObjectPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""deletedInstanceID"": 345678901,
-        ""deletedObjectCount"": 1,
-        ""totalDeletedCount"": 5,
-        ""saved"": true
-      }
-    }
-  ]
-}
-```
-
-**返回字段说明**:
+**关键返回字段说明**:
 
 - `deletedObjectPath`: 被删除对象的完整路径
-- `deletedInstanceID`: 被删除对象的 Unity 实例ID
-- `deletedObjectCount`: 直接删除的对象数量（始终为 1）
-- `totalDeletedCount`: 删除的对象总数（包含所有子物体）
-- `saved`: 预制体是否成功保存到磁盘
-
-**批量删除示例**:
-
-```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_delete_multiple"",""timeout"":30000,""commands"":[{""id"":""cmd_del1"",""type"":""prefab.deleteGameObject"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm""}},{""id"":""cmd_del2"",""type"":""prefab.deleteGameObject"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Cancel""}}]}'
-```
-
-**错误处理**:
-
-- `GameObject not found at path`: GameObject 路径不存在
-- `CANNOT_DELETE_ROOT`: 不能删除预制体根节点
-- 删除操作使用 Unity Undo 系统，可在编辑器中按 Ctrl+Z 撤销
-
-**注意事项**:
-
-- 删除操作会级联删除所有子物体
-- 不能删除预制体的根节点（会抛出错误）
-- 批量删除时，建议按照""从叶子节点到父节点""的顺序删除
-- 删除前可使用 `k3prefab.queryByK3Id` 查询确认对象信息
+- `deletedObjectCount`: 直接删除的对象数量(始终为 1)
+- `totalDeletedCount`: 删除的对象总数(包含所有子物体)
+- `saved`: 预制体是否成功保存
+- 不能删除预制体根节点(会返回 `CANNOT_DELETE_ROOT` 错误)
+- 批量删除建议按""从叶子节点到父节点""的顺序
 
 ---
 
-## 命令 5: prefab.moveOrCopyGameObject (移动或复制GameObject)
+## 命令 6: prefab.moveOrCopyGameObject (移动或复制GameObject)
 
 移动或复制 GameObject 到新的父节点，自动保持世界坐标不变。通过 `isCopy` 参数控制操作类型。
 
@@ -389,111 +239,98 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_co
 
 **参数说明**:
 
-- `prefabPath` 必填，预制体绝对路径(必须以 ""Assets/"" 开头)
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `sourcePath` 必填，源 GameObject 层级路径
 - `sourceSiblingIndex` 可选，源对象同名索引，默认为 0
 - `targetParentPath` 必填，目标父节点路径
 - `targetSiblingIndex` 可选，在目标父节点子物体列表中的位置，-1 或未指定表示移动到末尾，默认为 -1
 - `isCopy` 可选，true=复制操作，false=移动操作，默认为 false
 
-**移动操作返回结果示例**:
+**关键返回字段说明**:
 
-```json
-{
-  ""batchId"": ""batch_move_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_move"",
-      ""type"": ""prefab.moveOrCopyGameObject"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""sourcePath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""oldPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""newPath"": ""DialogMain/Panel_Other/K3Button_Confirm"",
-        ""oldSiblingIndex"": 2,
-        ""newSiblingIndex"": 0,
-        ""operationType"": ""move"",
-        ""worldPositionPreserved"": true,
-        ""operatedInstanceID"": 345678901,
-        ""saved"": true
-      }
-    }
-  ]
-}
-```
+移动操作(`isCopy`=false):
+- `oldPath`/`newPath`: 移动前后的完整路径
+- `operationType`: 固定为 ""move""
+- `worldPositionPreserved`: 是否保持世界坐标
 
-**复制操作返回结果示例**:
-
-```json
-{
-  ""batchId"": ""batch_copy_001"",
-  ""status"": ""completed"",
-  ""results"": [
-    {
-      ""id"": ""cmd_copy"",
-      ""type"": ""prefab.moveOrCopyGameObject"",
-      ""status"": ""success"",
-      ""result"": {
-        ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-        ""sourcePath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""originalPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-        ""copiedPath"": ""DialogMain/Panel_Other/K3Button_Confirm"",
-        ""sourceSiblingIndex"": 2,
-        ""targetSiblingIndex"": 0,
-        ""operationType"": ""copy"",
-        ""worldPositionPreserved"": true,
-        ""originalInstanceID"": 345678901,
-        ""copiedInstanceID"": 345678902,
-        ""saved"": true
-      }
-    }
-  ]
-}
-```
-
-**返回字段说明**:
-
-移动操作:
-- `oldPath`: 移动前的完整路径
-- `newPath`: 移动后的完整路径
-- `oldSiblingIndex`: 移动前的子物体索引
-- `newSiblingIndex`: 移动后的子物体索引
-- `operationType`: 操作类型，固定为 ""move""
-- `operatedInstanceID`: 被移动对象的 Unity 实例ID
-
-复制操作:
-- `originalPath`: 原对象的完整路径
-- `copiedPath`: 复制后新对象的完整路径
-- `sourceSiblingIndex`: 原对象的子物体索引
-- `targetSiblingIndex`: 新对象的子物体索引
-- `operationType`: 操作类型，固定为 ""copy""
-- `originalInstanceID`: 原对象的 Unity 实例ID
+复制操作(`isCopy`=true):
+- `originalPath`/`copiedPath`: 原对象与副本的完整路径
+- `operationType`: 固定为 ""copy""
 - `copiedInstanceID`: 新对象的 Unity 实例ID
 
-**批量移动示例**:
+通用:
+- `saved`: 预制体是否成功保存
+- 不能移动到自身或子节点下(`CANNOT_MOVE_TO_SELF_OR_CHILD`)
+- 不能复制到原父节点下(`CANNOT_COPY_TO_SAME_PARENT`)
+
+---
+
+## 命令 7: prefab.queryHierarchy (查询预制体层级结构)
+
+查询预制体的 GameObject 层级结构.支持两种返回模式: 默认返回完整层级树,传入 `nameContains` 时返回扁平匹配列表.
+
+**单命令示例** - 查询完整层级:
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_move_multiple"",""timeout"":30000,""commands"":[{""id"":""cmd_move1"",""type"":""prefab.moveOrCopyGameObject"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""sourcePath"":""DialogMain/Panel_Content/K3Button_Confirm"",""targetParentPath"":""DialogMain/Panel_Other"",""targetSiblingIndex"":0,""isCopy"":false}},{""id"":""cmd_move2"",""type"":""prefab.moveOrCopyGameObject"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""sourcePath"":""DialogMain/Panel_Content/K3Button_Cancel"",""targetParentPath"":""DialogMain/Panel_Other"",""targetSiblingIndex"":1,""isCopy"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_hierarchy_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""includeInactive"":true,""maxDepth"":-1}}]}'
 ```
 
-**错误处理**:
+**nameContains 模式示例** - 按名称模糊搜索:
 
-- `GameObject not found at path`: GameObject 路径不存在
-- `CANNOT_MOVE_TO_SELF_OR_CHILD`: 不能将物体移动到其自身或其子节点下
-- `CANNOT_COPY_TO_SAME_PARENT`: 不能将 GameObject 复制到其原父节点下
-- 移动/复制操作使用 Unity Undo 系统，可在编辑器中按 Ctrl+Z 撤销
+```bash
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_search_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""nameContains"":""Button"",""maxMatches"":50,""includeInactive"":true,""maxDepth"":-1}}]}'
+```
 
-**注意事项**:
+**参数说明**:
 
-- 移动和复制操作都会自动保持世界坐标不变（位置、旋转、缩放）
-- 当 `targetSiblingIndex` 超出范围时，对象会被放置在子物体列表末尾
-- 移动操作会改变原对象的层级结构，复制操作会创建新对象
-- 不能将对象移动到其自身或其子节点下（会抛出错误）
-- 不能将对象复制到其原父节点下（会抛出错误）
-- 批量操作时，删除和移动混合时，删除优先执行
-- 操作前可使用 `k3prefab.queryByK3Id` 查询确认对象信息
+- `prefabPath` 必填,Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
+- `includeInactive` 可选,是否包含禁用的 GameObject,默认 true
+- `maxDepth` 可选,最大遍历深度,-1 表示无限,默认 -1
+- `nameContains` 可选,名称模糊过滤(contains,IgnoreCase,对入参 Trim).传入后不返回 `hierarchy`,改为返回扁平 `matches[]`
+- `maxMatches` 可选,nameContains 模式下最多返回条数,默认 50
+
+**返回模式说明**:
+
+两种模式均返回 `prefabPath` 和 `rootName` 字段.
+
+默认模式(不传 nameContains):
+- `prefabPath`,`rootName`: 预制体路径与根节点名称
+- `totalGameObjects`: 总节点数
+- `hierarchy[]`: 嵌套树结构,每个节点含 `name`,`instanceID`,`path`,`siblingIndex`,`depth`,`isActive`,`children[]`
+
+nameContains 模式(传入 nameContains):
+- `prefabPath`,`rootName`: 预制体路径与根节点名称
+- `totalMatches`: 实际命中总数(未截断)
+- `matchedCount`: 本次返回条数(受 maxMatches 限制)
+- `truncated`: 是否被截断(totalMatches > matchedCount)
+- `matches[]`: 扁平列表,每个元素含 `name`,`instanceID`,`path`,`siblingIndex`,`depth`,`isActive`(不含 children)
+
+---
+
+## 命令 8: prefab.queryComponents (查询组件信息)
+
+查询预制体中指定 GameObject 的组件详情,支持类型过滤.
+
+**单命令示例**:
+
+```bash
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""],""includeBuiltin"":false,""includePrivateFields"":false}}]}'
+```
+
+**参数说明**:
+
+- `prefabPath` 必填,Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
+- `objectPath` 必填,GameObject 层级路径(从 prefab.queryHierarchy 返回的 path 字段获取)
+- `siblingIndex` 可选,同级索引(从 0 开始),用于定位同路径下的同名对象,默认 0
+- `componentFilter` 可选,组件类型过滤数组,null 表示返回全部
+- `includeBuiltin` 可选,是否包含 Unity 内置组件(RectTransform, Transform 等),默认 false
+- `includePrivateFields` 可选,是否包含私有字段(带 SerializeField 标记的),默认 false
+
+**关键返回字段说明**:
+
+- `objectPath`: 查询的 GameObject 路径
+- `totalComponents`: 返回的组件数量
+- `components[]`: 组件数组,每个元素含 `type`,`instanceID`,`scriptPath`,`properties`(属性键值对)
 
 ---
 
@@ -529,63 +366,7 @@ result = execute_command({
     }]
 })
 
-# 修改 GameObject 属性
-result = execute_command({
-    ""batchId"": ""batch_goprops_001"",
-    ""commands"": [{
-        ""type"": ""prefab.setGameObjectProperties"",
-        ""params"": {
-            ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-            ""objectPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-            ""properties"": {
-                ""name"": ""K3Button_Confirm_New"",
-                ""layer"": 5
-            }
-        }
-    }]
-})
-
-# 删除 GameObject
-result = execute_command({
-    ""batchId"": ""batch_delete_001"",
-    ""commands"": [{
-        ""type"": ""prefab.deleteGameObject"",
-        ""params"": {
-            ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-            ""objectPath"": ""DialogMain/Panel_Content/K3Button_Confirm""
-        }
-    }]
-})
-
-# 移动 GameObject
-result = execute_command({
-    ""batchId"": ""batch_move_001"",
-    ""commands"": [{
-        ""type"": ""prefab.moveOrCopyGameObject"",
-        ""params"": {
-            ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-            ""sourcePath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-            ""targetParentPath"": ""DialogMain/Panel_Other"",
-            ""targetSiblingIndex"": 0,
-            ""isCopy"": False
-        }
-    }]
-})
-
-# 复制 GameObject
-result = execute_command({
-    ""batchId"": ""batch_copy_001"",
-    ""commands"": [{
-        ""type"": ""prefab.moveOrCopyGameObject"",
-        ""params"": {
-            ""prefabPath"": ""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",
-            ""sourcePath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
-            ""targetParentPath"": ""DialogMain/Panel_Other"",
-            ""targetSiblingIndex"": 0,
-            ""isCopy"": True
-        }
-    }]
-})
+# 其他命令省略
 ```
 
 ---
@@ -603,19 +384,11 @@ result = execute_command({
 - **k3prefab.queryByK3Id**: 当你知道 K3ID 时使用，返回该 K3ID 对应的所有组件
 - **k3prefab.setComponentProperties**: 修改 K3 组件的特殊属性 (如 alpha、interactable、text 等)
 - **k3prefab.createComponent**: 在预制体中创建新的 K3UI 组件，自动分配 K3ID
+- **prefab.queryHierarchy**: 查询预制体层级结构(默认返回树,传 nameContains 返回扁平匹配列表)
+- **prefab.queryComponents**: 查询指定 GameObject 的组件详情
 - **prefab.setGameObjectProperties**: 修改 GameObject 的通用属性 (如 name、tag、layer、isActive 等)
 - **prefab.deleteGameObject**: 删除 GameObject 及其所有子物体
 - **prefab.moveOrCopyGameObject**: 移动或复制 GameObject 到新的父节点
-
-### 工作流建议
-
-1. 先用 `k3prefab.queryByK3Id` 查询 K3ID，获取组件的完整信息
-2. 从查询结果中获取当前属性值作为 `oldValue`，以及 `gameObjectPath`
-3. 使用 `k3prefab.setComponentProperties` 修改 K3 组件属性
-4. 使用 `prefab.setGameObjectProperties` 修改 GameObject 属性
-5. 使用 `prefab.deleteGameObject` 删除不需要的 GameObject（会级联删除子物体）
-6. 使用 `prefab.moveOrCopyGameObject` 移动或复制 GameObject 到新的父节点
-7. 如需验证，再次调用 `k3prefab.queryByK3Id` 确认修改结果
 
 ### 错误处理
 

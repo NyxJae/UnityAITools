@@ -44,7 +44,25 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             bool includeInactive = parameters.GetBool("includeInactive", true);
             int maxDepth = parameters.GetInt("maxDepth", -1);
 
-            // 遍历层级树
+            string nameContains = parameters.GetString("nameContains", null);
+            int maxMatches = parameters.GetInt("maxMatches", 50);
+
+            // nameContains 模式: 返回扁平 matches 列表(不返回 hierarchy)
+            if (!string.IsNullOrEmpty(nameContains) && !string.IsNullOrEmpty(nameContains.Trim()))
+            {
+                int totalMatches;
+                var matches = HierarchyTraverser.TraverseAndFilter(
+                    prefab,
+                    includeInactive,
+                    maxDepth,
+                    nameContains,
+                    maxMatches,
+                    out totalMatches);
+
+                return HierarchyJsonBuilder.BuildMatchesResult(prefabPath, prefab, matches, totalMatches);
+            }
+
+            // 默认模式: 遍历层级树
             HierarchyNode hierarchy = HierarchyTraverser.Traverse(prefab, includeInactive, maxDepth);
 
             // 构建结果(使用HierarchyJsonBuilder)

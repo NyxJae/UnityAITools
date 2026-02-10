@@ -14,51 +14,8 @@ namespace UnityAgentSkills
     [InitializeOnLoad]
     internal static class UnityAgentSkillsPlugin
     {
-        /// <summary>
-        /// pending文件排队项.
-        /// </summary>
-        private sealed class PendingFileItem
-        {
-            /// <summary>
-            /// 文件完整路径.
-            /// </summary>
-            public string fullPath;
-
-            /// <summary>
-            /// 命令id.
-            /// </summary>
-            public string id;
-
-            /// <summary>
-            /// 当前重试次数.
-            /// </summary>
-            public int attempt;
-
-            /// <summary>
-            /// 下次可重试的编辑器时间.
-            /// </summary>
-            public double nextAttemptEditorTime;
-
-            /// <summary>
-            /// 文件时间戳.
-            /// </summary>
-            public DateTime fileTime;
-        }
-
-        /// <summary>
-        /// 监听pending目录的文件监视器.
-        /// </summary>
-        private static FileSystemWatcher _watcher;
-
-        /// <summary>
-        /// 等待处理的pending队列.
-        /// </summary>
-        private static readonly List<PendingFileItem> _queue = new List<PendingFileItem>(64);
-
-        /// <summary>
-        /// 去重用的pending路径集合.
-        /// </summary>
-        private static readonly HashSet<string> _knownPending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly UnityAgentSkills.Internal.PendingQueue _pendingQueue = new UnityAgentSkills.Internal.PendingQueue();
+        private static UnityAgentSkills.Internal.PendingWatcher _pendingWatcher;
 
         /// <summary>
         /// 是否正在处理命令.
@@ -94,7 +51,7 @@ namespace UnityAgentSkills
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.update += OnEditorUpdate;
 
-            DisposeWatcher();
+            StopPendingWatcher();
 
             EnsureDirectories();
             LogCache.Initialize();
@@ -102,7 +59,7 @@ namespace UnityAgentSkills
             // 加载所有命令插件
             LoadCommandPlugins();
 
-            RegisterWatcher();
+            StartPendingWatcher();
             EnqueueAllPendingFiles();
 
             _nextRescanTime = EditorApplication.timeSinceStartup + UnityAgentSkillsConfig.PendingRescanIntervalSeconds;
@@ -154,7 +111,7 @@ namespace UnityAgentSkills
         private static void Shutdown()
         {
             EditorApplication.update -= OnEditorUpdate;
-            DisposeWatcher();
+            StopPendingWatcher();
             LogCache.Shutdown();
             CommandPluginLoader.ShutdownAllPlugins();
         }
@@ -170,62 +127,31 @@ namespace UnityAgentSkills
             Directory.CreateDirectory(UnityAgentSkillsConfig.DoneDirAbsolutePath);
         }
 
-        /// <summary>
-        /// 启动pending目录的文件监听.
-        /// </summary>
-        private static void RegisterWatcher()
+        private static void StartPendingWatcher()
         {
-            _watcher = new FileSystemWatcher
-            {
-                Path = UnityAgentSkillsConfig.PendingDirAbsolutePath,
-                Filter = "*.json",
-                IncludeSubdirectories = false,
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime
-            };
+            if (_pendingWatcher == null) _pendingWatcher = new UnityAgentSkills.Internal.PendingWatcher();
 
-            _watcher.Created += OnPendingChanged;
-            _watcher.Changed += OnPendingChanged;
-            _watcher.Renamed += OnPendingRenamed;
-            _watcher.EnableRaisingEvents = true;
+            _pendingWatcher.Start(UnityAgentSkillsConfig.PendingDirAbsolutePath, fullPath =>
+            {
+                // watcher 回调可能来自非主线程,不得触碰 Unity API.
+                _pendingQueue.TryEnqueuePendingFile(fullPath);
+            });
         }
 
-        /// <summary>
-        /// 释放文件监听器.
-        /// </summary>
-        private static void DisposeWatcher()
+        private static void StopPendingWatcher()
         {
-            if (_watcher == null) return;
+            if (_pendingWatcher == null) return;
 
             try
             {
-                _watcher.EnableRaisingEvents = false;
-                _watcher.Created -= OnPendingChanged;
-                _watcher.Changed -= OnPendingChanged;
-                _watcher.Renamed -= OnPendingRenamed;
-                _watcher.Dispose();
+                _pendingWatcher.Stop();
             }
             catch
             {
-                // 忽略释放时异常.
+                // watcher 释放阶段允许失败,避免关闭流程被异常打断.
             }
 
-            _watcher = null;
-        }
-
-        /// <summary>
-        /// pending文件被重命名时入队.
-        /// </summary>
-        private static void OnPendingRenamed(object sender, RenamedEventArgs e)
-        {
-            TryEnqueuePendingFile(e.FullPath);
-        }
-
-        /// <summary>
-        /// pending文件新增或更新时入队.
-        /// </summary>
-        private static void OnPendingChanged(object sender, FileSystemEventArgs e)
-        {
-            TryEnqueuePendingFile(e.FullPath);
+            _pendingWatcher = null;
         }
 
         /// <summary>
@@ -233,84 +159,7 @@ namespace UnityAgentSkills
         /// </summary>
         private static void EnqueueAllPendingFiles()
         {
-            if (!Directory.Exists(UnityAgentSkillsConfig.PendingDirAbsolutePath)) return;
-
-            string[] files = Directory.GetFiles(UnityAgentSkillsConfig.PendingDirAbsolutePath, "*.json", SearchOption.TopDirectoryOnly);
-            foreach (var f in files)
-            {
-                TryEnqueuePendingFile(f);
-            }
-
-            SortQueue();
-        }
-
-        /// <summary>
-        /// 将pending文件加入处理队列.
-        /// </summary>
-        /// <param name="fullPath">文件完整路径.</param>
-        private static void TryEnqueuePendingFile(string fullPath)
-        {
-            if (string.IsNullOrEmpty(fullPath)) return;
-            if (!File.Exists(fullPath)) return;
-
-            lock (_queue)
-            {
-                if (_knownPending.Contains(fullPath)) return;
-
-                string id = Path.GetFileNameWithoutExtension(fullPath);
-                if (string.IsNullOrEmpty(id)) return;
-
-                PendingFileItem item = new PendingFileItem
-                {
-                    fullPath = fullPath,
-                    id = id,
-                    attempt = 0,
-                    nextAttemptEditorTime = 0,
-                    fileTime = GetFileTimeForSort(fullPath)
-                };
-
-                _queue.Add(item);
-                _knownPending.Add(fullPath);
-
-                SortQueue();
-            }
-        }
-
-        /// <summary>
-        /// 按文件时间排序队列.
-        /// </summary>
-        private static void SortQueue()
-        {
-            _queue.Sort((a, b) =>
-            {
-                int cmp = a.fileTime.CompareTo(b.fileTime);
-                if (cmp != 0) return cmp;
-                return string.Compare(a.id, b.id, StringComparison.Ordinal);
-            });
-        }
-
-        /// <summary>
-        /// 获取文件用于排序的时间戳.
-        /// </summary>
-        /// <param name="path">文件路径.</param>
-        /// <returns>排序时间.</returns>
-        private static DateTime GetFileTimeForSort(string path)
-        {
-            try
-            {
-                return File.GetCreationTime(path);
-            }
-            catch
-            {
-                try
-                {
-                    return File.GetLastWriteTime(path);
-                }
-                catch
-                {
-                    return DateTime.Now;
-                }
-            }
+            _pendingQueue.EnqueueAllPendingFiles(UnityAgentSkillsConfig.PendingDirAbsolutePath);
         }
 
         /// <summary>
@@ -364,21 +213,8 @@ namespace UnityAgentSkills
 
             if (_isProcessing) return;
 
-            PendingFileItem item = null;
-            lock (_queue)
-            {
-                if (_queue.Count > 0)
-                {
-                    if (now >= _queue[0].nextAttemptEditorTime)
-                    {
-                        item = _queue[0];
-                        _queue.RemoveAt(0);
-                        _knownPending.Remove(item.fullPath);
-                    }
-                }
-            }
-
-            if (item == null) return;
+            UnityAgentSkills.Internal.PendingQueue.PendingItem item;
+            if (!_pendingQueue.TryDequeueReady(now, out item)) return;
 
             // 开始新的批次会话.
             ProcessPendingFile(item);
@@ -390,7 +226,7 @@ namespace UnityAgentSkills
         /// </summary>
         private sealed class BatchExecutionSession
         {
-            private readonly PendingFileItem _item;
+            private readonly UnityAgentSkills.Internal.PendingQueue.PendingItem _item;
             private readonly BatchPendingCommand _batchCmd;
             private readonly BatchResult _batchResult;
             private readonly DateTime _batchStartTime;
@@ -406,7 +242,7 @@ namespace UnityAgentSkills
 
             public bool IsDone { get; private set; }
 
-            public BatchExecutionSession(PendingFileItem item, BatchPendingCommand batchCmd)
+            public BatchExecutionSession(UnityAgentSkills.Internal.PendingQueue.PendingItem item, BatchPendingCommand batchCmd)
             {
                 _item = item;
                 _batchCmd = batchCmd;
@@ -667,7 +503,7 @@ namespace UnityAgentSkills
         /// 读取并处理pending命令文件(仅支持批量命令格式).
         /// </summary>
         /// <param name="item">队列项.</param>
-        private static void ProcessPendingFile(PendingFileItem item)
+        private static void ProcessPendingFile(UnityAgentSkills.Internal.PendingQueue.PendingItem item)
         {
             _isProcessing = true;
 
@@ -688,7 +524,7 @@ namespace UnityAgentSkills
         /// 处理批量命令.
         /// </summary>
         /// <param name="item">队列项.</param>
-        private static void ProcessBatchCommand(PendingFileItem item)
+        private static void ProcessBatchCommand(UnityAgentSkills.Internal.PendingQueue.PendingItem item)
         {
             BatchPendingCommand batchCmd;
             try
@@ -722,7 +558,7 @@ namespace UnityAgentSkills
         /// </summary>
         /// <param name="item">队列项.</param>
         /// <returns>是否继续重试.</returns>
-        private static bool ShouldRetryRead(PendingFileItem item)
+        private static bool ShouldRetryRead(UnityAgentSkills.Internal.PendingQueue.PendingItem item)
         {
             return item.attempt < UnityAgentSkillsConfig.ReadRetryDelaysMs.Length;
         }
@@ -731,30 +567,12 @@ namespace UnityAgentSkills
         /// 重新排队等待读取重试.
         /// </summary>
         /// <param name="item">队列项.</param>
-        private static void Reschedule(PendingFileItem item)
+        private static void Reschedule(UnityAgentSkills.Internal.PendingQueue.PendingItem item)
         {
             int delayMs = UnityAgentSkillsConfig.ReadRetryDelaysMs[item.attempt];
-            item.attempt++;
-            item.nextAttemptEditorTime = EditorApplication.timeSinceStartup + (delayMs / 1000.0);
-
-            // 严格保持处理顺序:最早的文件重试等待期间不允许后续插队.
-            lock (_queue)
-            {
-                _queue.Insert(0, item);
-                _knownPending.Add(item.fullPath);
-            }
-
+            _pendingQueue.RescheduleToFront(item, delayMs);
             _isProcessing = false;
         }
-
-
-
-        // NOTE: ProcessBatchCommands 已由 BatchExecutionSession 取代(跨帧非阻塞).保留历史实现会导致重复路径.
-        // private static void ProcessBatchCommands(...) { ... }
-
-
-
-
 
         /// <summary>
         /// 写入批量命令错误结果并归档.

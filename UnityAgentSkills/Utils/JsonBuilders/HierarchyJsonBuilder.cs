@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityAgentSkills.Utils;
-using UnityAgentSkills.Utils.JsonBuilders;
 using LitJson2_utf;
 
 namespace UnityAgentSkills.Utils.JsonBuilders
@@ -68,6 +67,60 @@ namespace UnityAgentSkills.Utils.JsonBuilders
             json["children"] = children;
 
             return json;
+        }
+
+        /// <summary>
+        /// 构建名称过滤(matches)的结果JSON.
+        /// 当 prefab.queryHierarchy 传入 nameContains 时使用.
+        /// </summary>
+        /// <param name="prefabPath">预制体路径(以 "Assets/" 开头).</param>
+        /// <param name="prefab">预制体根 GameObject.</param>
+        /// <param name="matches">匹配到的扁平节点列表(最多 maxMatches 条).</param>
+        /// <param name="totalMatches">总命中数(未截断).</param>
+        /// <returns>名称过滤(matches)模式的结果 JSON.</returns>
+        public static JsonData BuildMatchesResult(
+            string prefabPath,
+            GameObject prefab,
+            System.Collections.Generic.List<HierarchyNode> matches,
+            int totalMatches)
+        {
+            JsonData result = JsonResultBuilder.CreateObject();
+
+            result["prefabPath"] = prefabPath ?? "";
+            result["rootName"] = prefab != null ? prefab.name : "";
+            result["totalMatches"] = totalMatches;
+
+            int matchedCount = matches != null ? matches.Count : 0;
+            result["matchedCount"] = matchedCount;
+            result["truncated"] = totalMatches > matchedCount;
+            result["matches"] = BuildMatchesArray(matches);
+
+            return result;
+        }
+
+        private static JsonData BuildMatchesArray(System.Collections.Generic.List<HierarchyNode> matches)
+        {
+            JsonData arr = JsonResultBuilder.CreateArray();
+            if (matches == null)
+            {
+                return arr;
+            }
+
+            foreach (var node in matches)
+            {
+                JsonData json = JsonResultBuilder.CreateObject();
+
+                json["name"] = node.name ?? "";
+                json["instanceID"] = node.instanceID;
+                json["path"] = node.path ?? "";
+                json["siblingIndex"] = node.siblingIndex;
+                json["depth"] = node.depth;
+                json["isActive"] = node.isActive;
+
+                arr.Add(json);
+            }
+
+            return arr;
         }
 
         /// <summary>

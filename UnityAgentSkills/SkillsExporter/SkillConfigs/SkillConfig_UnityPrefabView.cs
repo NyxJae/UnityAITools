@@ -59,10 +59,12 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 
 **prefab.queryHierarchy 参数说明**:
 
-- `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
-- 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
+- `prefabPath` 必填,Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
+- 路径分隔符自动适配,支持 Windows 反斜杠(\\) 和 macOS/Linux 正斜杠(/)
 - `includeInactive` 可选,是否包含禁用的 GameObject,默认 true
 - `maxDepth` 可选,最大遍历深度,-1 表示无限,默认 -1
+- `nameContains` 可选,名称模糊过滤(contains).当传入时,将不返回 `hierarchy`,改为返回扁平列表 `matches[]`(IgnoreCase,对入参 Trim)
+- `maxMatches` 可选,当传入 nameContains 时生效,最多返回的 matches 条数,默认 50.超过时将被截断,并通过 `totalMatches`,`matchedCount`,`truncated` 体现
 
 **prefab.queryHierarchy 返回结果示例**:
 
@@ -98,6 +100,49 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
                 ""children"": []
               }
             ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**prefab.queryHierarchy nameContains 模式示例**:
+
+当 `params` 中传入 `nameContains` 时,将返回 `matches[]`(扁平列表),不再返回 `hierarchy`.
+
+```json
+{
+  ""batchId"": ""batch_prefab_hierarchy_search_001"",
+  ""status"": ""completed"",
+  ""results"": [
+    {
+      ""id"": ""cmd_001"",
+      ""type"": ""prefab.queryHierarchy"",
+      ""status"": ""success"",
+      ""result"": {
+        ""prefabPath"": ""Assets/Resources/Prefabs/DialogMain.prefab"",
+        ""rootName"": ""DialogMain"",
+        ""totalMatches"": 2,
+        ""matchedCount"": 2,
+        ""truncated"": false,
+        ""matches"": [
+          {
+            ""name"": ""K3Button_Confirm"",
+            ""instanceID"": 345678901,
+            ""path"": ""DialogMain/Panel_Content/K3Button_Confirm"",
+            ""depth"": 2,
+            ""siblingIndex"": 0,
+            ""isActive"": true
+          },
+          {
+            ""name"": ""Button_Close"",
+            ""instanceID"": 987654321,
+            ""path"": ""DialogMain/Panel_Content/Button_Close"",
+            ""depth"": 2,
+            ""siblingIndex"": 1,
+            ""isActive"": true
           }
         ]
       }
