@@ -47,7 +47,7 @@ namespace UnityAgentSkills.Utils
                 name = root.name,
                 instanceID = root.GetInstanceID(),
                 path = GameObjectPathFinder.GetPath(root),
-                siblingIndex = root.transform.GetSiblingIndex(),
+                siblingIndex = GameObjectPathFinder.GetSameNameSiblingIndex(root.transform),
                 depth = 0,
                 isActive = root.activeSelf
             };
@@ -89,7 +89,7 @@ namespace UnityAgentSkills.Utils
                     name = child.name,
                     instanceID = child.gameObject.GetInstanceID(),
                     path = GameObjectPathFinder.GetPath(child.gameObject),
-                    siblingIndex = child.GetSiblingIndex(),
+                    siblingIndex = GameObjectPathFinder.GetSameNameSiblingIndex(child),
                     depth = currentDepth + 1,
                     isActive = child.gameObject.activeSelf
                 };
@@ -199,7 +199,7 @@ namespace UnityAgentSkills.Utils
                         name = current.name,
                         instanceID = current.gameObject.GetInstanceID(),
                         path = GameObjectPathFinder.GetPath(current.gameObject),
-                        siblingIndex = current.GetSiblingIndex(),
+                        siblingIndex = GameObjectPathFinder.GetSameNameSiblingIndex(current),
                         depth = currentDepth,
                         isActive = current.gameObject.activeSelf
                     });

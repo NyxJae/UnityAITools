@@ -159,6 +159,17 @@ namespace UnityAgentSkills.Core
                         string path = ex.Message.Substring("GameObject not found at path: ".Length);
                         cmdResult.error = CommandErrorFactory.CreateGameObjectNotFoundError(path);
                     }
+                    // 处理仅编辑模式允许的命令在 Play 模式下被调用
+                    else if (ex is InvalidOperationException && ex.Message != null && ex.Message.StartsWith(UnityAgentSkillCommandErrorCodes.OnlyAllowedInEditMode + ": "))
+                    {
+                        string detail = ex.Message.Substring(UnityAgentSkillCommandErrorCodes.OnlyAllowedInEditMode.Length + 2);
+                        cmdResult.error = new CommandError
+                        {
+                            code = UnityAgentSkillCommandErrorCodes.OnlyAllowedInEditMode,
+                            message = detail,
+                            detail = ex.Message
+                        };
+                    }
                     // 处理未知命令类型异常
                     else if (ex is NotSupportedException)
                     {

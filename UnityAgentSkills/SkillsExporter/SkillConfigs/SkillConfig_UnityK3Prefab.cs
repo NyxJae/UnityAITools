@@ -116,7 +116,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_k3
 
 **参数说明**:
 
-- `prefabPath` 必填，Unity 工程内 Assets 相对路径
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `k3Id` 必填，K3 组件的 ID
 - `index` 可选，同 K3ID 中的索引（用于精确定位），默认为 0
 - `modifications` 必填，修改请求数组，每个元素包含:
@@ -146,15 +146,15 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""_batch_g
 
 **参数说明**:
 
-- `prefabPath` 必填，Unity 工程内 Assets 相对路径
+- `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `objectPath` 必填，GameObject 层级路径 (从 k3prefab.queryByK3Id 返回的 gameObjectPath 获取)
-- `siblingIndex` 可选，同名对象索引，默认为 0
+- `siblingIndex` 可选，同名对象序号(从 0 开始)，默认为 0
 - `properties` 必填，要修改的属性对象，支持的字段:
   - `name` (string) 对象名称
   - `tag` (string) 标签
   - `layer` (int) 层级 (0-31)
   - `isActive` (bool) 激活状态
-  - `isStatic` (bool) 静态标记
+
   - `hideFlags` (int) 隐藏标志
 
 **关键返回字段说明**:
@@ -208,7 +208,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_de
 
 - `prefabPath` 必填，Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `objectPath` 必填，GameObject 层级路径
-- `siblingIndex` 可选，同名对象索引，默认为 0
+- `siblingIndex` 可选，同名对象序号(从 0 开始)，默认为 0
 
 **关键返回字段说明**:
 
@@ -314,16 +314,15 @@ nameContains 模式(传入 nameContains):
 **单命令示例**:
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""],""includeBuiltin"":false,""includePrivateFields"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/ResourcesAB/UIPrefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""transform"",""k3""],""includePrivateFields"":false}}]}'
 ```
 
 **参数说明**:
 
 - `prefabPath` 必填,Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头)
 - `objectPath` 必填,GameObject 层级路径(从 prefab.queryHierarchy 返回的 path 字段获取)
-- `siblingIndex` 可选,同级索引(从 0 开始),用于定位同路径下的同名对象,默认 0
-- `componentFilter` 可选,组件类型过滤数组,null 表示返回全部
-- `includeBuiltin` 可选,是否包含 Unity 内置组件(RectTransform, Transform 等),默认 false
+- `siblingIndex` 可选,同名对象序号(从 0 开始),用于定位同路径下的同名对象,默认 0
+- `componentFilter` 可选,组件名称模糊过滤(contains + IgnoreCase + OR),`null`/空数组/空字符串表示不过滤,返回所有组件(含内置组件)
 - `includePrivateFields` 可选,是否包含私有字段(带 SerializeField 标记的),默认 false
 
 **关键返回字段说明**:
@@ -392,6 +391,9 @@ result = execute_command({
 
 ### 错误处理
 
+- **INVALID_FIELDS**: 参数非法,例如 prefabPath 不是 Assets/.../*.prefab
+- **PREFAB_NOT_FOUND**: 预制体文件不存在
+- **EMPTY_MODIFICATIONS**: k3prefab.setComponentProperties 的 modifications 缺失或为空
 - **K3ID_NOT_FOUND**: 未找到指定 K3ID 的组件
 - **INDEX_OUT_OF_RANGE**: 索引超出范围 (K3ID 匹配数量少于请求的索引)
 - **旧值不匹配**: 当 oldValue 与实际值不符时，该属性会被跳过 (status=skipped)

@@ -8,6 +8,7 @@ using UnityAgentSkills.Core;
 using UnityAgentSkills.Utils;
 using UnityAgentSkills.Plugins.K3Prefab.Utils;
 using UnityAgentSkills.Plugins.K3Prefab.Models;
+using UnityAgentSkills.Plugins.Prefab.Handlers;
 
 namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 {
@@ -26,10 +27,8 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 
             // 2. 参数读取和验证
             string prefabPath = parameters.GetString("prefabPath", null);
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
 
             uint k3Id = 0;
             if (parameters.Has("k3Id"))
@@ -55,22 +54,22 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             // 解析modifications数组
             if (!parameters.Has("modifications"))
             {
-                throw new ArgumentException("EMPTY_MODIFICATIONS: modifications参数缺失");
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.EmptyModifications + ": modifications参数缺失");
             }
 
             JsonData modificationsJson = parameters.GetData()["modifications"];
             if (modificationsJson == null || !modificationsJson.IsArray || modificationsJson.Count == 0)
             {
-                throw new ArgumentException("EMPTY_MODIFICATIONS: modifications数组不能为空");
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.EmptyModifications + ": modifications数组不能为空");
             }
 
             var modifications = ParseModifications(modificationsJson);
 
             // 3. 加载预制体
-            GameObject prefab = PrefabLoader.LoadPrefab(prefabPath);
+            GameObject prefab = PrefabLoader.LoadPrefab(normalizedPrefabPath);
             if (prefab == null)
             {
-                throw new InvalidOperationException($"PREFAB_NOT_FOUND: 预制体文件不存在: {prefabPath}");
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             // 4. 查找K3组件
@@ -78,12 +77,12 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 
             if (allMatches.Count == 0)
             {
-                throw new InvalidOperationException($"K3ID_NOT_FOUND: 未找到K3ID为{k3Id}的组件");
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.IdNotFound + ": 未找到K3ID为" + k3Id + "的组件");
             }
 
             if (index >= allMatches.Count)
             {
-                throw new IndexOutOfRangeException($"INDEX_OUT_OF_RANGE: 索引超出范围，K3ID {k3Id}只有{allMatches.Count}个匹配项（索引0-{allMatches.Count - 1}），但请求了索引{index}");
+                throw new IndexOutOfRangeException(UnityAgentSkillCommandErrorCodes.IndexOutOfRange + ": 索引超出范围，K3ID " + k3Id + "只有" + allMatches.Count + "个匹配项（索引0-" + (allMatches.Count - 1) + "），但请求了索引" + index);
             }
 
             var targetMatch = allMatches[index];
@@ -95,7 +94,7 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             bool saved = false;
             if (modificationResults.Any(r => r.status == "success"))
             {
-                PrefabUtility.SaveAsPrefabAsset(prefab, prefabPath);
+                PrefabUtility.SaveAsPrefabAsset(prefab, normalizedPrefabPath);
                 saved = true;
             }
 
@@ -103,11 +102,11 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             JsonData result = new JsonData();
             result.SetJsonType(JsonType.Object);
 
-            result["prefabPath"] = prefabPath;
+            result["prefabPath"] = normalizedPrefabPath;
             result["k3Id"] = (JsonData)k3Id;
             result["index"] = (JsonData)index;
             result["gameObjectPath"] = K3ComponentPropertyReader.ReadGameObjectPath(targetMatch.gameObject);
-            result["componentType"] = targetMatch.component.GetType().Name;
+
 
             // 构建modifications结果数组
             JsonData modificationsArray = new JsonData();

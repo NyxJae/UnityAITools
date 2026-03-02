@@ -3,9 +3,6 @@ using UnityEditor;
 using LitJson2_utf;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 namespace UnityAgentSkills.Utils
 {
@@ -32,54 +29,14 @@ namespace UnityAgentSkills.Utils
     internal static class ComponentPropertyReader
     {
         /// <summary>
-        /// 内置组件类型列表.
-        /// </summary>
-        private static readonly HashSet<Type> BuiltinComponentTypes = new HashSet<Type>
-        {
-            typeof(Transform),
-            typeof(RectTransform),
-            typeof(Camera),
-            typeof(Light),
-            typeof(CanvasRenderer),
-            typeof(Canvas),
-            typeof(CanvasGroup),
-            typeof(GraphicRaycaster),
-            typeof(PhysicsRaycaster),
-            typeof(Rigidbody),
-            typeof(Rigidbody2D),
-            typeof(Collider),
-            typeof(Collider2D),
-            typeof(AudioSource),
-            typeof(Animation),
-            typeof(Animator),
-            typeof(ParticleSystem),
-            typeof(TrailRenderer),
-            typeof(LineRenderer)
-        };
-
-        /// <summary>
-        /// 判断组件是否为内置组件.
-        /// </summary>
-        public static bool IsBuiltinComponent(Component component)
-        {
-            if (component == null)
-            {
-                return false;
-            }
-
-            return BuiltinComponentTypes.Contains(component.GetType());
-        }
-
-        /// <summary>
         /// 读取GameObject上的所有组件信息.
         /// </summary>
         /// <param name="gameObject">目标GameObject.</param>
-        /// <param name="componentFilter">组件类型过滤,null表示全部.</param>
-        /// <param name="includeBuiltin">是否包含内置组件.</param>
+        /// <param name="componentFilter">组件类型过滤,null/空数组/空字符串表示不过滤.支持模糊匹配(包含匹配,大小写不敏感).</param>
         /// <param name="includePrivateFields">是否包含私有字段.</param>
         /// <returns>组件信息列表.</returns>
-        public static List<ComponentInfo> ReadComponents(GameObject gameObject, 
-            string[] componentFilter = null, bool includeBuiltin = false, bool includePrivateFields = false)
+        public static List<ComponentInfo> ReadComponents(GameObject gameObject,
+            string[] componentFilter = null, bool includePrivateFields = false)
         {
             List<ComponentInfo> result = new List<ComponentInfo>();
             if (gameObject == null)
@@ -94,25 +51,26 @@ namespace UnityAgentSkills.Utils
             {
                 try
                 {
-                    // 检查是否为内置组件
-                    if (!includeBuiltin && IsBuiltinComponent(comp))
-                    {
-                        continue;
-                    }
-
-                    // 检查类型过滤
+                    // 检查类型过滤: OR 关系,包含匹配,大小写不敏感.
                     if (componentFilter != null && componentFilter.Length > 0)
                     {
                         string typeName = comp.GetType().Name;
                         bool matched = false;
                         foreach (string filter in componentFilter)
                         {
-                            if (typeName.Equals(filter, StringComparison.OrdinalIgnoreCase))
+                            if (string.IsNullOrWhiteSpace(filter))
+                            {
+                                matched = true;
+                                break;
+                            }
+
+                            if (typeName.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
                             {
                                 matched = true;
                                 break;
                             }
                         }
+
                         if (!matched)
                         {
                             continue;

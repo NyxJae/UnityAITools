@@ -15,12 +15,34 @@ namespace UnityAgentSkills.UI
         /// <summary>
         /// 显示Unity技能导出器窗口.
         /// </summary>
-        [MenuItem("Tools/Unity-skills")]
+        [MenuItem("Tools/Unity-skills/打开Unity Skills面板", false, 0)]
         public static void ShowWindow()
         {
             var window = GetWindow<SkillsExporterWindow>();
             window.titleContent = new GUIContent("Unity Skills");
             window.minSize = new Vector2(500, 400);
+        }
+
+        /// <summary>
+        /// 重启UnityAgentSkills命令服务,并优先清理pending队列.
+        /// </summary>
+        [MenuItem("Tools/Unity-skills/重启命令服务")]
+        public static void RestartCommandServiceMenu()
+        {
+            bool confirm = EditorUtility.DisplayDialog(
+                "重启命令服务",
+                "将先删除pending目录内未处理命令,再重启命令服务.\n该操作不可撤销,是否继续?",
+                "继续",
+                "取消");
+
+            if (!confirm)
+            {
+                return;
+            }
+
+            int purgedCount = UnityAgentSkillsPlugin.RestartCommandService(true);
+            Debug.Log($"[UnityAgentSkills] 命令服务已重启,已清理pending命令文件数量: {purgedCount}");
+            EditorUtility.DisplayDialog("重启完成", $"命令服务已重启.\n已清理pending命令文件数量: {purgedCount}", "确定");
         }
 
         private void OnEnable()

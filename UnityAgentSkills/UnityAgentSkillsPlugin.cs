@@ -33,6 +33,11 @@ namespace UnityAgentSkills
         private static bool _shutdownHooked;
 
         /// <summary>
+        /// SessionState键: 标记当前Unity会话是否已执行过pending初始化清理.
+        /// </summary>
+        private const string PendingPurgeSessionKey = "UnityAgentSkills.PendingPurgedOnSessionStartup";
+
+        /// <summary>
         /// 静态构造函数,编辑器加载时自动初始化插件.
         /// </summary>
         static UnityAgentSkillsPlugin()
@@ -52,9 +57,22 @@ namespace UnityAgentSkills
             EditorApplication.update += OnEditorUpdate;
 
             StopPendingWatcher();
+            ResetRuntimeState();
 
             EnsureDirectories();
+            if (ShouldPurgePendingOnSessionStartup())
+            {
+                int purgedCount = PurgePendingCommandFiles();
+                if (purgedCount > 0)
+                {
+                    Debug.Log($"[UnityAgentSkills] 会话首次初始化已清理pending命令文件: {purgedCount}");
+                }
+            }
+
             LogCache.Initialize();
+
+            // 每次初始化前清空注册表,避免热重启后残留旧处理器.
+            CommandHandlerRegistry.Instance.Clear();
 
             // 加载所有命令插件
             LoadCommandPlugins();
@@ -63,6 +81,20 @@ namespace UnityAgentSkills
             EnqueueAllPendingFiles();
 
             _nextRescanTime = EditorApplication.timeSinceStartup + UnityAgentSkillsConfig.PendingRescanIntervalSeconds;
+        }
+
+        /// <summary>
+        /// 判断是否应在当前Unity会话启动阶段清理pending目录.
+        /// </summary>
+        private static bool ShouldPurgePendingOnSessionStartup()
+        {
+            if (SessionState.GetBool(PendingPurgeSessionKey, false))
+            {
+                return false;
+            }
+
+            SessionState.SetBool(PendingPurgeSessionKey, true);
+            return true;
         }
 
         /// <summary>
@@ -112,8 +144,79 @@ namespace UnityAgentSkills
         {
             EditorApplication.update -= OnEditorUpdate;
             StopPendingWatcher();
+            ResetRuntimeState();
             LogCache.Shutdown();
             CommandPluginLoader.ShutdownAllPlugins();
+        }
+
+        /// <summary>
+        /// 重启命令服务.
+        /// </summary>
+        /// <param name="purgePendingFirst">是否在重启前清理pending目录.</param>
+        /// <returns>清理的pending文件数量.</returns>
+        internal static int RestartCommandService(bool purgePendingFirst)
+        {
+            StopPendingWatcher();
+            ResetRuntimeState();
+
+            int purgedCount = 0;
+            if (purgePendingFirst)
+            {
+                EnsureDirectories();
+                purgedCount = PurgePendingCommandFiles();
+            }
+
+            LogCache.Initialize();
+            CommandHandlerRegistry.Instance.Clear();
+            CommandPluginLoader.ShutdownAllPlugins();
+            LoadCommandPlugins();
+
+            StartPendingWatcher();
+            EnqueueAllPendingFiles();
+            _nextRescanTime = EditorApplication.timeSinceStartup + UnityAgentSkillsConfig.PendingRescanIntervalSeconds;
+
+            return purgedCount;
+        }
+
+        /// <summary>
+        /// 重置运行时状态,避免历史会话在重启后继续推进.
+        /// </summary>
+        private static void ResetRuntimeState()
+        {
+            _activeSession = null;
+            _isProcessing = false;
+            _pendingQueue.Clear();
+        }
+
+        /// <summary>
+        /// 清理pending目录下尚未处理的命令文件.
+        /// </summary>
+        /// <returns>已删除的文件数量.</returns>
+        private static int PurgePendingCommandFiles()
+        {
+            string pendingDir = UnityAgentSkillsConfig.PendingDirAbsolutePath;
+            if (!Directory.Exists(pendingDir))
+            {
+                return 0;
+            }
+
+            string[] files = Directory.GetFiles(pendingDir, "*.json", SearchOption.TopDirectoryOnly);
+            int deletedCount = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                string filePath = files[i];
+                try
+                {
+                    File.Delete(filePath);
+                    deletedCount++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[UnityAgentSkills] 清理pending文件失败: {filePath}. {ex.Message}");
+                }
+            }
+
+            return deletedCount;
         }
 
         /// <summary>
@@ -239,6 +342,9 @@ namespace UnityAgentSkills
             private int _currentCmdTimeoutMs;
             private bool _waitingScreenshot;
             private UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.ScreenshotJob _screenshotJob;
+            private DateTime _screenshotCaptureStartedAt;
+            private bool _waitingPlayModeWaitFor;
+            private UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeWaitForHandler.WaitForJob _waitForJob;
 
             public bool IsDone { get; private set; }
 
@@ -277,8 +383,110 @@ namespace UnityAgentSkills
                     });
                 }
 
-                // 首次写入 processing.
-                BatchResultWriter.WriteProcessing(_batchResult);
+                bool resumed = TryResumeFromProcessingResult();
+                if (!resumed)
+                {
+                    // 首次写入 processing.
+                    BatchResultWriter.WriteProcessing(_batchResult);
+                }
+            }
+
+            private bool TryResumeFromProcessingResult()
+            {
+                string resultPath = Path.Combine(UnityAgentSkillsConfig.ResultsDirAbsolutePath, (_batchCmd.batchId ?? string.Empty) + ".json");
+                if (!File.Exists(resultPath))
+                {
+                    return false;
+                }
+
+                JsonData root;
+                try
+                {
+                    root = JsonMapper.ToObject(File.ReadAllText(resultPath));
+                }
+                catch
+                {
+                    return false;
+                }
+
+                if (root == null || !root.IsObject || !root.ContainsKey("status") || !root.ContainsKey("results"))
+                {
+                    return false;
+                }
+
+                if (!string.Equals(root["status"].ToString(), BatchStatuses.Processing, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                JsonData persistedResults = root["results"];
+                if (persistedResults == null || !persistedResults.IsArray)
+                {
+                    return false;
+                }
+
+                if (root.ContainsKey("startedAt"))
+                {
+                    _batchResult.startedAt = root["startedAt"].ToString();
+                }
+
+                _cmdIndex = 0;
+                _batchResult.successCount = 0;
+                _batchResult.failedCount = 0;
+
+                int count = Math.Min(_batchResult.results.Count, persistedResults.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    JsonData persisted = persistedResults[i];
+                    if (persisted == null || !persisted.IsObject || !persisted.ContainsKey("status"))
+                    {
+                        break;
+                    }
+
+                    BatchCommandResult current = _batchResult.results[i];
+                    string persistedId = persisted.ContainsKey("id") ? persisted["id"].ToString() : string.Empty;
+                    string persistedType = persisted.ContainsKey("type") ? persisted["type"].ToString() : string.Empty;
+                    if (!string.Equals(persistedId, current.id ?? string.Empty, StringComparison.Ordinal) ||
+                        !string.Equals(persistedType, current.type ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+
+                    string status = persisted["status"].ToString();
+                    if (!string.Equals(status, UnityAgentSkillCommandStatuses.Success, StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(status, UnityAgentSkillCommandStatuses.Error, StringComparison.OrdinalIgnoreCase))
+                    {
+                        break;
+                    }
+
+                    current.status = status;
+                    if (persisted.ContainsKey("startedAt")) current.startedAt = persisted["startedAt"].ToString();
+                    if (persisted.ContainsKey("finishedAt")) current.finishedAt = persisted["finishedAt"].ToString();
+                    if (persisted.ContainsKey("result")) current.result = persisted["result"];
+                    if (persisted.ContainsKey("error") && persisted["error"] != null && persisted["error"].IsObject)
+                    {
+                        JsonData err = persisted["error"];
+                        current.error = new CommandError
+                        {
+                            code = err.ContainsKey("code") ? err["code"].ToString() : string.Empty,
+                            message = err.ContainsKey("message") ? err["message"].ToString() : string.Empty,
+                            detail = err.ContainsKey("detail") ? err["detail"].ToString() : string.Empty
+                        };
+                    }
+
+                    if (string.Equals(status, UnityAgentSkillCommandStatuses.Success, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _batchResult.successCount++;
+                    }
+                    else
+                    {
+                        _batchResult.failedCount++;
+                    }
+
+                    _cmdIndex = i + 1;
+                }
+
+                return _cmdIndex > 0;
             }
 
             public void Tick()
@@ -303,38 +511,6 @@ namespace UnityAgentSkills
                 BatchCommand cmd = _batchCmd.commands[_cmdIndex];
                 BatchCommandResult cmdResult = _batchResult.results[_cmdIndex];
 
-                // 若正在等待 screenshot 落盘,则只做轮询.
-                if (_waitingScreenshot)
-                {
-                    int elapsedMs = (int)(DateTime.Now - _currentCmdStartTime).TotalMilliseconds;
-                    if (UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.IsFileReadablePng(_screenshotJob.pngAbsolutePath))
-                    {
-                        cmdResult.status = UnityAgentSkillCommandStatuses.Success;
-                        cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
-                        cmdResult.result = UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.BuildSuccessResult(_screenshotJob);
-                        _batchResult.successCount++;
-                        _waitingScreenshot = false;
-                        _cmdIndex++;
-                        BatchResultWriter.WriteProcessing(_batchResult);
-                        return;
-                    }
-
-                    if (elapsedMs > _currentCmdTimeoutMs)
-                    {
-                        cmdResult.status = UnityAgentSkillCommandStatuses.Error;
-                        cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
-                        cmdResult.error = CommandErrorFactory.CreateTimeoutError(elapsedMs, _currentCmdTimeoutMs);
-                        _batchResult.failedCount++;
-                        _waitingScreenshot = false;
-                        _cmdIndex++;
-                        BatchResultWriter.WriteProcessing(_batchResult);
-                        return;
-                    }
-
-                    // 仍在等待,保持占位状态.
-                    return;
-                }
-
                 // 进入新命令.
                 if (string.IsNullOrEmpty(cmdResult.startedAt))
                 {
@@ -343,23 +519,95 @@ namespace UnityAgentSkills
                     _currentCmdTimeoutMs = cmd.timeout ?? _batchTimeoutMs;
                 }
 
+                // playmode.stop 后紧接 playmode.start 时,需要等待 Editor 完成退回 EditMode.
+                // 否则 start 会在同帧命中 isPlayingOrWillChangePlaymode,被误判为 already active.
+                if (string.Equals(cmd.type, UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeStartHandler.CommandType, StringComparison.OrdinalIgnoreCase) &&
+                    UnityAgentSkills.Plugins.PlayMode.PlayModeSession.IsStopTransitionInProgress())
+                {
+                    return;
+                }
+
                 try
                 {
-                    // 特殊处理 log.screenshot: 触发截图,并进入等待态(非阻塞).
+                    if (string.Equals(cmd.type, UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeWaitForHandler.CommandType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        DateTime now = DateTime.Now;
+                        DateTime nowUtc = DateTime.UtcNow;
+                        if (!_waitingPlayModeWaitFor)
+                        {
+                            _waitForJob = UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeWaitForHandler.CreateJob(cmd.@params, nowUtc);
+                            _waitingPlayModeWaitFor = true;
+                        }
+
+                        JsonData waitForResult;
+                        bool waitForCompleted = UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeWaitForHandler.TryComplete(_waitForJob, nowUtc, out waitForResult);
+                        if (!waitForCompleted)
+                        {
+                            BatchResultWriter.WriteProcessing(_batchResult);
+                            return;
+                        }
+
+                        _waitingPlayModeWaitFor = false;
+                        cmdResult.status = UnityAgentSkillCommandStatuses.Success;
+                        cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(now);
+                        cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, waitForResult, null);
+                        _batchResult.successCount++;
+                        _batchResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(now);
+                        BatchResultWriter.WriteProcessing(_batchResult);
+                        _cmdIndex++;
+                        return;
+                    }
+
                     if (string.Equals(cmd.type, "log.screenshot", StringComparison.OrdinalIgnoreCase))
                     {
-                        JsonData effectiveParams = InjectScreenshotContext(cmd.@params, _batchCmd.batchId, cmd.id, CountScreenshotCommands(_batchCmd));
-                        _screenshotJob = UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.CreateJob(effectiveParams);
-                        UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.BeginCapture(_screenshotJob);
+                        DateTime now = DateTime.Now;
+                        if (!_waitingScreenshot)
+                        {
+                            JsonData effectiveParams = InjectScreenshotContext(cmd.@params, _batchCmd.batchId, cmd.id, CountScreenshotCommands(_batchCmd));
+                            _screenshotJob = UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.CreateJob(effectiveParams);
+                            UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.BeginCapture(_screenshotJob);
+                            _screenshotCaptureStartedAt = now;
+                            _waitingScreenshot = true;
+                            BatchResultWriter.WriteProcessing(_batchResult);
+                            return;
+                        }
 
-                        // processing 阶段先写入 result 路径(不写 success,避免与"success=文件可读"语义冲突).
-                        // 最终文件可读时再将 status 置为 success.
-                        cmdResult.status = "";
-                        cmdResult.result = UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.BuildSuccessResult(_screenshotJob);
+                        JsonData screenshotResult;
+                        CommandError screenshotError;
+                        bool completed = UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.TryComplete(
+                            _screenshotJob,
+                            _screenshotCaptureStartedAt,
+                            now,
+                            out screenshotResult,
+                            out screenshotError);
 
-                        _currentCmdTimeoutMs = Math.Min(_currentCmdTimeoutMs, UnityAgentSkills.Plugins.Log.Handlers.LogScreenshotCommandHandler.ScreenshotReadyTimeoutMs);
-                        _waitingScreenshot = true;
+                        if (!completed)
+                        {
+                            BatchResultWriter.WriteProcessing(_batchResult);
+                            return;
+                        }
+
+                        _waitingScreenshot = false;
+
+                        if (screenshotError != null)
+                        {
+                            cmdResult.status = UnityAgentSkillCommandStatuses.Error;
+                            cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(now);
+                            cmdResult.error = screenshotError;
+                            cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, null, cmdResult.error);
+                            _batchResult.failedCount++;
+                        }
+                        else
+                        {
+                            cmdResult.status = UnityAgentSkillCommandStatuses.Success;
+                            cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(now);
+                            cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, screenshotResult, null);
+                            _batchResult.successCount++;
+                        }
+
+                        _batchResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(now);
                         BatchResultWriter.WriteProcessing(_batchResult);
+                        _cmdIndex++;
                         return;
                     }
 
@@ -372,13 +620,14 @@ namespace UnityAgentSkills
                         cmdResult.status = UnityAgentSkillCommandStatuses.Error;
                         cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
                         cmdResult.error = CommandErrorFactory.CreateTimeoutError(elapsedMs, _currentCmdTimeoutMs);
+                        cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, null, cmdResult.error);
                         _batchResult.failedCount++;
                     }
                     else
                     {
                         cmdResult.status = UnityAgentSkillCommandStatuses.Success;
                         cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
-                        cmdResult.result = resultData;
+                        cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, resultData, null);
                         _batchResult.successCount++;
                     }
                 }
@@ -395,6 +644,10 @@ namespace UnityAgentSkills
                         string detail = ex.Message.Substring(UnityAgentSkillCommandErrorCodes.InvalidFields.Length + 1).Trim();
                         cmdResult.error = CommandErrorFactory.CreateInvalidFieldsError(detail);
                     }
+                    else if (TryCreateCodePrefixedError(ex, out CommandError prefixedError))
+                    {
+                        cmdResult.error = prefixedError;
+                    }
                     else if (ex is NotSupportedException)
                     {
                         cmdResult.error = CommandErrorFactory.CreateUnknownCommandError(cmd.type, ex.Message);
@@ -406,12 +659,272 @@ namespace UnityAgentSkills
 
                     cmdResult.status = UnityAgentSkillCommandStatuses.Error;
                     cmdResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
+                    cmdResult.result = BuildUnifiedResultPayload(cmd, cmdResult.status, null, cmdResult.error);
                     _batchResult.failedCount++;
                 }
 
                 _batchResult.finishedAt = UnityAgentSkillsConfig.FormatTimestamp(DateTime.Now);
                 BatchResultWriter.WriteProcessing(_batchResult);
                 _cmdIndex++;
+            }
+
+            private static bool TryCreateCodePrefixedError(Exception ex, out CommandError error)
+            {
+                error = null;
+                if (ex == null || string.IsNullOrEmpty(ex.Message)) return false;
+
+                int separatorIndex = ex.Message.IndexOf(':');
+                if (separatorIndex <= 0) return false;
+
+                string code = ex.Message.Substring(0, separatorIndex).Trim();
+                if (string.IsNullOrEmpty(code) || !IsKnownCommandErrorCode(code)) return false;
+
+                string message = ex.Message.Substring(separatorIndex + 1).TrimStart();
+                error = new CommandError
+                {
+                    code = code,
+                    message = string.IsNullOrEmpty(message) ? code : message,
+                    detail = ex.Message
+                };
+                return true;
+            }
+
+            private static bool IsKnownCommandErrorCode(string code)
+            {
+                switch (code)
+                {
+                    case UnityAgentSkillCommandErrorCodes.PlayModeNotActive:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeStartFailed:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeAlreadyActive:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeInterrupted:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotFound:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotVisible:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotInteractable:
+                    case UnityAgentSkillCommandErrorCodes.InvalidTargetIndex:
+                    case UnityAgentSkillCommandErrorCodes.NoElementAtPosition:
+                    case UnityAgentSkillCommandErrorCodes.InvalidCoordinates:
+                    case UnityAgentSkillCommandErrorCodes.UnsupportedElementType:
+                    case UnityAgentSkillCommandErrorCodes.AmbiguousTarget:
+                    case UnityAgentSkillCommandErrorCodes.GameViewNotAvailable:
+                    case UnityAgentSkillCommandErrorCodes.ScreenshotFailed:
+                    case UnityAgentSkillCommandErrorCodes.PrefabNotFound:
+                    case UnityAgentSkillCommandErrorCodes.GameObjectNotFound:
+                    case UnityAgentSkillCommandErrorCodes.ComponentTypeNotFound:
+                    case UnityAgentSkillCommandErrorCodes.AmbiguousComponentType:
+                    case UnityAgentSkillCommandErrorCodes.ComponentNotFound:
+                    case UnityAgentSkillCommandErrorCodes.ComponentAlreadyExists:
+                    case UnityAgentSkillCommandErrorCodes.CannotDeleteRequiredComponent:
+                    case UnityAgentSkillCommandErrorCodes.PropertyNotFound:
+                    case UnityAgentSkillCommandErrorCodes.InvalidPropertyPath:
+                    case UnityAgentSkillCommandErrorCodes.TypeMismatch:
+                    case UnityAgentSkillCommandErrorCodes.ReferenceTargetNotFound:
+                    case UnityAgentSkillCommandErrorCodes.ReferenceTargetTypeMismatch:
+                    case UnityAgentSkillCommandErrorCodes.AssetNotFound:
+                    case UnityAgentSkillCommandErrorCodes.AssetTypeMismatch:
+                    case UnityAgentSkillCommandErrorCodes.EmptyProperties:
+                    case UnityAgentSkillCommandErrorCodes.EmptyModifications:
+                    case UnityAgentSkillCommandErrorCodes.IdNotFound:
+                    case UnityAgentSkillCommandErrorCodes.IndexOutOfRange:
+                    case UnityAgentSkillCommandErrorCodes.InvalidRegex:
+                    case UnityAgentSkillCommandErrorCodes.Timeout:
+                    case UnityAgentSkillCommandErrorCodes.OnlyAllowedInEditMode:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
+            private JsonData BuildUnifiedResultPayload(BatchCommand cmd, string commandStatus, JsonData data, CommandError error)
+            {
+                if (cmd == null || string.IsNullOrEmpty(cmd.type) || !cmd.type.StartsWith("playmode.", StringComparison.OrdinalIgnoreCase))
+                {
+                    return data;
+                }
+
+                if (data != null && data.IsObject && data.ContainsKey("meta") && data.ContainsKey("data"))
+                {
+                    return data;
+                }
+
+                JsonData payload = new JsonData();
+
+                JsonData meta = new JsonData();
+                meta["sessionId"] = _batchCmd != null ? (_batchCmd.batchId ?? string.Empty) : string.Empty;
+                meta["sessionState"] = UnityAgentSkills.Plugins.PlayMode.PlayModeSession.State.ToString();
+                meta["commandId"] = cmd.id ?? string.Empty;
+                DateTime now = DateTime.Now;
+                meta["timestamp"] = UnityAgentSkillsConfig.FormatTimestamp(now);
+                meta["durationMs"] = (int)(now - _currentCmdStartTime).TotalMilliseconds;
+                payload["meta"] = meta;
+
+                JsonData safeData = data;
+                if (safeData == null)
+                {
+                    safeData = new JsonData();
+                    safeData.SetJsonType(JsonType.Object);
+                }
+                payload["data"] = safeData;
+
+                JsonData diagnostics = BuildPlayModeDiagnostics(cmd.type, commandStatus, error, data);
+                if (diagnostics != null)
+                {
+                    payload["diagnostics"] = diagnostics;
+                }
+
+                return payload;
+            }
+
+            private static JsonData BuildPlayModeDiagnostics(string commandType, string commandStatus, CommandError error, JsonData data)
+            {
+                if (error == null)
+                {
+                    return null;
+                }
+
+                JsonData diagnostics = new JsonData();
+                diagnostics["stage"] = ResolveDiagnosticsStage(commandType, error.code);
+                diagnostics["retryable"] = ResolveDiagnosticsRetryable(error.code);
+
+                JsonData hints = new JsonData();
+                hints.SetJsonType(JsonType.Array);
+                string[] suggestions = ResolveRecoveryHints(error.code);
+                for (int i = 0; i < suggestions.Length; i++)
+                {
+                    hints.Add(suggestions[i]);
+                }
+
+                diagnostics["recoveryHints"] = hints;
+                if (string.Equals(error.code, UnityAgentSkillCommandErrorCodes.AmbiguousTarget, StringComparison.Ordinal))
+                {
+                    diagnostics["candidateCount"] = ResolveCandidateCount(data, error.detail);
+                }
+
+                return diagnostics;
+            }
+
+            private static string ResolveDiagnosticsStage(string commandType, string errorCode)
+            {
+                switch (errorCode)
+                {
+                    case UnityAgentSkillCommandErrorCodes.AmbiguousTarget:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotFound:
+                        return "resolve";
+                    case UnityAgentSkillCommandErrorCodes.ElementNotInteractable:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotVisible:
+                    case UnityAgentSkillCommandErrorCodes.InvalidCoordinates:
+                    case UnityAgentSkillCommandErrorCodes.NoElementAtPosition:
+                    case UnityAgentSkillCommandErrorCodes.UnsupportedElementType:
+                        return "act";
+                    case UnityAgentSkillCommandErrorCodes.Timeout:
+                    case UnityAgentSkillCommandErrorCodes.ScreenshotFailed:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeInterrupted:
+                    case UnityAgentSkillCommandErrorCodes.GameViewNotAvailable:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeNotActive:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeStartFailed:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeAlreadyActive:
+                        return "verify";
+                    default:
+                        return string.Equals(commandType, UnityAgentSkills.Plugins.PlayMode.Handlers.PlayModeQueryUIHandler.CommandType, StringComparison.OrdinalIgnoreCase) ? "query" : "act";
+                }
+            }
+
+            private static bool ResolveDiagnosticsRetryable(string errorCode)
+            {
+                switch (errorCode)
+                {
+                    case UnityAgentSkillCommandErrorCodes.Timeout:
+                    case UnityAgentSkillCommandErrorCodes.ScreenshotFailed:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeInterrupted:
+                    case UnityAgentSkillCommandErrorCodes.GameViewNotAvailable:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeNotActive:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeStartFailed:
+                    case UnityAgentSkillCommandErrorCodes.ElementNotInteractable:
+                    case UnityAgentSkillCommandErrorCodes.AmbiguousTarget:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
+            private static string[] ResolveRecoveryHints(string errorCode)
+            {
+                switch (errorCode)
+                {
+                    case UnityAgentSkillCommandErrorCodes.AmbiguousTarget:
+                        return new[]
+                        {
+                            "补充 siblingIndex 以消除路径歧义",
+                            "优先使用 queryUI 返回的 elementId 做动作命中"
+                        };
+                    case UnityAgentSkillCommandErrorCodes.ElementNotInteractable:
+                        return new[]
+                        {
+                            "先使用 log.screenshot 观察界面状态后再重试动作",
+                            "检查目标是否被遮罩或动画锁定"
+                        };
+                    case UnityAgentSkillCommandErrorCodes.InvalidCoordinates:
+                        return new[]
+                        {
+                            "改用 queryUI 返回的 path+siblingIndex 定位",
+                            "确认坐标位于当前 GameView 可见范围"
+                        };
+                    case UnityAgentSkillCommandErrorCodes.Timeout:
+                        return new[]
+                        {
+                            "扩大 timeout 或 waitUntilElementTimeout",
+                            "先缩小 queryUI 筛选范围后再执行验证"
+                        };
+                    case UnityAgentSkillCommandErrorCodes.PlayModeInterrupted:
+                    case UnityAgentSkillCommandErrorCodes.PlayModeNotActive:
+                        return new[]
+                        {
+                            "重新执行 playmode.start",
+                            "按 query -> action -> verify 重新建立链路"
+                        };
+                    default:
+                        return new[]
+                        {
+                            "先执行 queryUI 获取最新可交互目标",
+                            "根据 diagnostics.stage 调整下一步命令"
+                        };
+                }
+            }
+
+            private static int ResolveCandidateCount(JsonData data, string detail)
+            {
+                if (data != null && data.IsObject && data.ContainsKey("candidateCount"))
+                {
+                    try
+                    {
+                        return (int)data["candidateCount"];
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(detail))
+                {
+                    const string marker = "candidateCount=";
+                    int idx = detail.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0)
+                    {
+                        string value = detail.Substring(idx + marker.Length).Trim();
+                        int end = value.IndexOfAny(new[] { ',', ';', ' ', ')' });
+                        if (end > 0)
+                        {
+                            value = value.Substring(0, end);
+                        }
+
+                        int parsed;
+                        if (int.TryParse(value, out parsed))
+                        {
+                            return parsed;
+                        }
+                    }
+                }
+
+                return 0;
             }
 
             private void FinishBatchAsCompleted()
@@ -444,8 +957,6 @@ namespace UnityAgentSkills
                     _batchResult.failedCount++;
                 }
 
-                _waitingScreenshot = false;
-
                 // 超时属于批次正常完成态(含部分失败),对外 batch status 仍为 completed.
                 FinishBatchAsCompleted();
             }
@@ -472,23 +983,38 @@ namespace UnityAgentSkills
             }
 
             /// <summary>
-            /// 为 log.screenshot 注入执行上下文(不属于对外协议字段).
-            /// 复制自 BatchCommandExecutor,但放在这里以便跨帧会话使用.
+            /// 为截图相关命令注入执行上下文(不属于对外协议字段).
+            /// 通过深拷贝保持原始 params 不变,避免跨帧流程污染调用方输入.
             /// </summary>
             private static JsonData InjectScreenshotContext(JsonData rawParams, string batchId, string cmdId, int screenshotCommandCount)
             {
                 JsonData data = new JsonData();
 
-                // 深拷贝原始 params,避免注入字段污染输入对象.
                 if (rawParams != null && rawParams.IsObject)
                 {
                     try
                     {
                         data = JsonMapper.ToObject(rawParams.ToJson());
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        Debug.LogWarning("[UnityAgentSkills] Deep clone screenshot params failed, fallback to shallow copy. " + ex.Message);
+
                         data = new JsonData();
+                        try
+                        {
+                            foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)rawParams)
+                            {
+                                string key = entry.Key as string;
+                                if (string.IsNullOrEmpty(key)) continue;
+                                data[key] = (JsonData)entry.Value;
+                            }
+                        }
+                        catch (Exception ex2)
+                        {
+                            Debug.LogWarning("[UnityAgentSkills] Shallow copy screenshot params failed, fallback to empty object. " + ex2.Message);
+                            data = new JsonData();
+                        }
                     }
                 }
 
@@ -526,6 +1052,20 @@ namespace UnityAgentSkills
         /// <param name="item">队列项.</param>
         private static void ProcessBatchCommand(UnityAgentSkills.Internal.PendingQueue.PendingItem item)
         {
+            if (item == null || string.IsNullOrEmpty(item.fullPath))
+            {
+                _isProcessing = false;
+                return;
+            }
+
+            // 队列项可能因为重复事件或历史残留成为“陈旧项”,此时文件已不存在,应直接忽略.
+            if (!File.Exists(item.fullPath))
+            {
+                Debug.Log("[UnityAgentSkills] 跳过陈旧pending项,文件不存在: " + item.fullPath);
+                _isProcessing = false;
+                return;
+            }
+
             BatchPendingCommand batchCmd;
             try
             {
@@ -533,6 +1073,14 @@ namespace UnityAgentSkills
             }
             catch (Exception ex)
             {
+                // Parse阶段再次兜底: 文件若已被归档/删除,按陈旧项处理,避免误写INVALID_JSON.
+                if (!File.Exists(item.fullPath))
+                {
+                    Debug.Log("[UnityAgentSkills] Parse阶段跳过陈旧pending项,文件不存在: " + item.fullPath);
+                    _isProcessing = false;
+                    return;
+                }
+
                 // 仅对JSON解析失败等暂时性错误触发重试
                 if (ex is ArgumentException && ShouldRetryRead(item))
                 {
@@ -542,10 +1090,10 @@ namespace UnityAgentSkills
 
                 string[] parts = ex.Message.Split(new[] { ": " }, 2, StringSplitOptions.None);
                 string code = parts[0];
-                string message = ex.Message;
-                string detail = parts.Length > 1 ? parts[1] : "";
+                string message = parts.Length > 1 ? parts[1] : ex.Message;
+                string detail = ex.Message;
 
-                WriteBatchErrorAndArchive(item.id, null, null, code, message, detail);
+                WriteBatchErrorAndArchive(item.id, item.id, null, code, message, detail);
                 return;
             }
 

@@ -54,6 +54,20 @@ namespace UnityAgentSkills.SkillsExporter
                         Description = SkillConfig_UnityK3Prefab.SkillDescription,
                         Markdown = SkillConfig_UnityK3Prefab.SkillMarkdown
                     }
+                },
+                { SkillConfig_UnityPlayMode.SkillName, new SkillConfig
+                    {
+                        Name = SkillConfig_UnityPlayMode.SkillName,
+                        Description = SkillConfig_UnityPlayMode.SkillDescription,
+                        Markdown = SkillConfig_UnityPlayMode.SkillMarkdown
+                    }
+                },
+                { SkillConfig_UnityScene.SkillName, new SkillConfig
+                    {
+                        Name = SkillConfig_UnityScene.SkillName,
+                        Description = SkillConfig_UnityScene.SkillDescription,
+                        Markdown = SkillConfig_UnityScene.SkillMarkdown
+                    }
                 }
             };
         }

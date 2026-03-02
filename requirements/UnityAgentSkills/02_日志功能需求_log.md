@@ -57,7 +57,8 @@
 
 - 不查询 Unity Editor 启动前的历史日志文件(只查本次启动后实时捕获的日志缓存).
 - 不做跨文件的复杂全文检索或结构化日志分析.
-- `log.screenshot` 不提供指定分辨率,指定相机,或裁剪区域等高级参数(本期固定截图 Game 视图).
+- `log.screenshot` 不提供指定分辨率,指定相机,或裁剪输出图等高级参数(本期固定截图 Game 视图).
+- `log.screenshot` 仅支持可选 `highlightRect`,用于全图截图红框标注.
 
 ## 3. 输入协议
 
@@ -118,16 +119,18 @@
 
 ### 3.4 log.screenshot 参数(params)
 
-当前版本仅支持单张截图,因此 `params` 为空对象即可.
+当前版本仅支持单张全图截图.`params` 可为空对象,也可仅传红框标注参数.
 
-| 参数名 | 类型 | 必填 | 默认值 | 说明 |
-| ------ | ---: | ---: | -----: | ---- |
-| (无)   |      |      |        |      |
+| 参数名          |   类型 | 必填 | 默认值 | 说明                                      |
+| --------------- | -----: | ---: | -----: | ----------------------------------------- |
+| `highlightRect` | object |   否 |      - | 红框标注区域,格式 `{xMin,xMax,yMin,yMax}` |
 
 参数规则:
 
-- 调用方应传 `{}`.
-- 如传入本命令未定义的字段,按框架对"未知字段"的统一策略处理(不在本命令内单独定义兼容逻辑).
+- `params` 可传 `{}`.
+- `highlightRect` 越界时自动裁剪到图像边界,不报错.
+- `highlightRect` 无效(如 `xMin > xMax`)时,返回 `INVALID_FIELDS`.
+- 如传入本命令未定义字段,按框架对"未知字段"的统一策略处理.
 
 ## 4. 输出协议
 
@@ -158,7 +161,8 @@
 
 - 返回:
   - `mode`: 固定为 `single`.
-  - `imageAbsolutePath`: 图片绝对路径.
+  - `imageAbsolutePath`: 图片绝对路径(全图).
+  - `highlightApplied`: bool,是否应用了红框标注.
 
 路径格式约定:
 
@@ -273,9 +277,35 @@
 - 预期:
   - `results[0].status=success`.
   - `results[0].result.mode="single"`.
+  - `results[0].result.highlightApplied=false`.
   - `imageAbsolutePath` 指向的 png 文件存在且非 0 字节.
 
-### 例 4: 一个 batch 多条 log.screenshot 的命名冲突避免
+### 例 4: log.screenshot 带区域红框
+
+- pending 输入:
+
+```json
+{
+  "batchId": "batch_shot_highlight_001",
+  "commands": [
+    {
+      "id": "cmd_001",
+      "type": "log.screenshot",
+      "params": {
+        "highlightRect": { "xMin": 420, "xMax": 1500, "yMin": 200, "yMax": 900 }
+      }
+    }
+  ]
+}
+```
+
+- 预期:
+  - `results[0].status=success`.
+  - `results[0].result.highlightApplied=true`.
+  - 返回文件是全图 PNG,并带红框标注.
+  - 不返回裁剪图路径.
+
+### 例 5: 一个 batch 多条 log.screenshot 的命名冲突避免
 
 - pending 输入:
 

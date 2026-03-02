@@ -31,6 +31,18 @@ namespace UnityAgentSkills.Internal
             }
         }
 
+        /// <summary>
+        /// 清空内存中的 pending 队列和去重索引.
+        /// </summary>
+        public void Clear()
+        {
+            lock (_queue)
+            {
+                _queue.Clear();
+                _knownPending.Clear();
+            }
+        }
+
         public void EnqueueAllPendingFiles(string pendingDirAbsolutePath)
         {
             if (!Directory.Exists(pendingDirAbsolutePath)) return;

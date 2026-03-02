@@ -26,59 +26,42 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
         /// <returns>结果json.</returns>
         public static JsonData Execute(JsonData rawParams)
         {
-            // 1. 参数解析
             CommandParams parameters = new CommandParams(rawParams);
 
             string prefabPath = parameters.GetString("prefabPath", null);
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
             string objectPath = parameters.GetString("objectPath", null);
             int siblingIndex = parameters.GetInt("siblingIndex", 0);
 
-            // 2. 参数验证
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
-            if (string.IsNullOrEmpty(objectPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": objectPath is required");
-            }
-
-            // 3. 加载预制体到编辑场景（使用 PrefabUtility.LoadPrefabContents 以支持预制体编辑）
-            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+            // 需要在 Prefab 编辑场景中加载,才能安全修改并保存到资源文件.
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(normalizedPrefabPath);
             if (prefabRoot == null)
             {
-                throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             try
             {
-                // 4. 定位目标GameObject
-                GameObject target = GameObjectPathFinder.FindByPath(prefabRoot, objectPath, siblingIndex);
-                if (target == null)
-                {
-                    throw new InvalidOperationException("GameObject not found at path: " + objectPath + " (siblingIndex=" + siblingIndex + ")");
-                }
+                GameObject target = PrefabComponentHandlerUtils.FindGameObjectOrThrow(prefabRoot, objectPath, siblingIndex, "objectPath");
 
-                // 5. 验证不是根节点
+                // 根节点是预制体载体,不允许删除.
                 if (target == prefabRoot)
                 {
                     throw new InvalidOperationException("CANNOT_DELETE_ROOT: 不能删除预制体根节点: " + objectPath);
                 }
 
-                // 6. 记录删除信息
                 string deletedObjectPath = GameObjectPathFinder.GetPath(target);
                 int deletedInstanceID = target.GetInstanceID();
                 int totalDeletedCount = CountGameObjects(target, true); // 包含所有子物体
 
-                // 7. 使用Undo系统删除GameObject
+                // 通过 Undo 删除,保留编辑器回退链路.
                 Undo.DestroyObjectImmediate(target);
 
-                // 8. 保存预制体
-                bool saved = PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+                bool saved = PrefabUtility.SaveAsPrefabAsset(prefabRoot, normalizedPrefabPath);
 
-                // 9. 构建结果
                 JsonData result = JsonResultBuilder.CreateObject();
-                result["prefabPath"] = prefabPath;
+                result["prefabPath"] = normalizedPrefabPath;
                 result["deletedObjectPath"] = deletedObjectPath;
                 result["deletedInstanceID"] = deletedInstanceID;
                 result["deletedObjectCount"] = 1;
@@ -89,7 +72,7 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             }
             finally
             {
-                // 10. 无论成功或失败，都要卸载预制体编辑场景
+                // 无论成功或失败都卸载编辑场景,避免残留临时对象.
                 PrefabUtility.UnloadPrefabContents(prefabRoot);
             }
         }

@@ -72,6 +72,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_sc
 ### Notes
 
 - `log.screenshot` 仅截图 Game 视图,且落盘完成后才会返回 `success`.
+- `log.screenshot` 仅支持可选 `highlightRect`.
 - 批量命令采用串行执行,严格按输入顺序.
 ";
     }

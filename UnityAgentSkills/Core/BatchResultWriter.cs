@@ -150,17 +150,11 @@ namespace UnityAgentSkills.Core
                     string text = File.ReadAllText(f);
                     if (string.IsNullOrEmpty(text)) continue;
 
-                    // 先做轻量判断,避免不必要的解析
-                    if (text.Contains("\"status\":\"processing\""))
-                    {
-                        continue;
-                    }
-
                     JsonData jd = JsonMapper.ToObject(text);
                     if (jd != null && jd.IsObject && jd.ContainsKey("status"))
                     {
                         string status = jd["status"].ToString();
-                        // completed是最终状态,应该参与清理,避免results无上限增长
+                        // 仅依据顶层status判断最终态,避免命令级status="processing"导致误判.
                         if (status == UnityAgentSkillCommandStatuses.Success || status == UnityAgentSkillCommandStatuses.Error || status == BatchStatuses.Completed)
                         {
                             finals.Add(f);
@@ -259,18 +253,25 @@ namespace UnityAgentSkills.Core
                 JsonData cmd = results[i];
                 if (cmd == null || !cmd.IsObject) continue;
 
-                if (!cmd.ContainsKey("type") || !string.Equals(cmd["type"].ToString(), "log.screenshot", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!cmd.ContainsKey("type")) continue;
                 if (!cmd.ContainsKey("status") || cmd["status"].ToString() != UnityAgentSkillCommandStatuses.Success) continue;
                 if (!cmd.ContainsKey("result")) continue;
 
+                string type = cmd["type"].ToString();
                 JsonData result = cmd["result"];
                 if (result == null || !result.IsObject) continue;
 
-                // single
-                if (result.ContainsKey("imageAbsolutePath"))
+                if (string.Equals(type, "log.screenshot", StringComparison.OrdinalIgnoreCase))
                 {
-                    TryDeleteScreenshotPath(result["imageAbsolutePath"].ToString());
+                    if (result.ContainsKey("imageAbsolutePath"))
+                    {
+                        TryDeleteScreenshotPath(result["imageAbsolutePath"].ToString());
+                    }
+
+                    continue;
                 }
+
+
             }
         }
 

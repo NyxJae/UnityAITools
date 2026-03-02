@@ -5,6 +5,7 @@ using UnityEditor;
 using LitJson2_utf;
 using UnityAgentSkills.Core;
 using UnityAgentSkills.Utils;
+using UnityAgentSkills.Plugins.Prefab.Handlers;
 using K3Engine.Component.Interfaces;
 using K3Editor;
 
@@ -54,10 +55,8 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 
             // 2. 参数读取和验证
             string prefabPath = parameters.GetString("prefabPath", null);
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
 
             string parentPath = parameters.GetString("parentPath", null);
             if (string.IsNullOrEmpty(parentPath))
@@ -87,11 +86,10 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             }
 
             // 3. 加载预制体到编辑场景（使用 PrefabUtility.LoadPrefabContents 以支持预制体编辑）
-            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(normalizedPrefabPath);
             if (prefabRoot == null)
             {
-                CommandError error = CommandErrorFactory.CreatePrefabNotFoundError(prefabPath);
-                throw new InvalidOperationException($"{error.message}: {error.detail}");
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             // 4. 查找父节点
@@ -128,10 +126,10 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             GameObject componentGO = CreateComponent(parentGO, componentType, initialProperties);
 
             // 8. 保存预制体
-            PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+            PrefabUtility.SaveAsPrefabAsset(prefabRoot, normalizedPrefabPath);
 
             // 9. 构建返回结果（在卸载预制体之前，因为 componentGO 在编辑场景中）
-            JsonData result = BuildResult(prefabPath, parentPath, componentType, componentGO);
+            JsonData result = BuildResult(normalizedPrefabPath, parentPath, componentType, componentGO);
 
             // 10. 卸载预制体编辑场景
             PrefabUtility.UnloadPrefabContents(prefabRoot);

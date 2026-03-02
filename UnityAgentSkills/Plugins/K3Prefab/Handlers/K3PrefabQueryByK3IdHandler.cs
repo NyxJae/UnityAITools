@@ -6,6 +6,7 @@ using UnityAgentSkills.Core;
 using UnityAgentSkills.Utils;
 using UnityAgentSkills.Plugins.K3Prefab.Utils;
 using UnityAgentSkills.Plugins.K3Prefab.Models;
+using UnityAgentSkills.Plugins.Prefab.Handlers;
 
 namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 {
@@ -24,10 +25,8 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
 
             // 2. 参数读取和验证
             string prefabPath = parameters.GetString("prefabPath", null);
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
 
             uint k3Id = 0;
             if (parameters.Has("k3Id"))
@@ -56,10 +55,10 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             }
 
             // 3. 加载预制体
-            GameObject prefab = PrefabLoader.LoadPrefab(prefabPath);
+            GameObject prefab = PrefabLoader.LoadPrefab(normalizedPrefabPath);
             if (prefab == null)
             {
-                throw new InvalidOperationException($"PREFAB_NOT_FOUND: 预制体文件不存在: {prefabPath}");
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             // 4. 查找K3组件
@@ -72,14 +71,14 @@ namespace UnityAgentSkills.Plugins.K3Prefab.Handlers
             var allMatches = K3ComponentFinder.FindComponentsByK3Id(prefab, k3Id, null);
             if (allMatches.Count == 0)
             {
-                throw new InvalidOperationException($"K3ID_NOT_FOUND: 未找到K3ID为{k3Id}的组件");
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.IdNotFound + ": 未找到K3ID为" + k3Id + "的组件");
             }
 
             // 5. 构建结果
             JsonData result = new JsonData();
             result.SetJsonType(JsonType.Object);
 
-            result["prefabPath"] = prefabPath;
+            result["prefabPath"] = normalizedPrefabPath;
             result["k3Id"] = (JsonData)k3Id;
             result["totalMatches"] = (JsonData)matches.Count;
 

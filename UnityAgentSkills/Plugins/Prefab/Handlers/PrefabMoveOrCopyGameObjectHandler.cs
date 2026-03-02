@@ -26,21 +26,17 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
         /// <returns>结果json.</returns>
         public static JsonData Execute(JsonData rawParams)
         {
-            // 1. 参数解析
             CommandParams parameters = new CommandParams(rawParams);
 
             string prefabPath = parameters.GetString("prefabPath", null);
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
             string sourcePath = parameters.GetString("sourcePath", null);
             int sourceSiblingIndex = parameters.GetInt("sourceSiblingIndex", 0);
             string targetParentPath = parameters.GetString("targetParentPath", null);
             int targetSiblingIndex = parameters.GetInt("targetSiblingIndex", -1);
             bool isCopy = parameters.GetBool("isCopy", false);
 
-            // 2. 参数验证
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
             if (string.IsNullOrEmpty(sourcePath))
             {
                 throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": sourcePath is required");
@@ -50,33 +46,21 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                 throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": targetParentPath is required");
             }
 
-            // 3. 加载预制体到编辑场景（使用 PrefabUtility.LoadPrefabContents 以支持预制体编辑）
-            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+            // 需要在 Prefab 编辑场景中加载,才能安全修改并保存到资源文件.
+            GameObject prefabRoot = PrefabUtility.LoadPrefabContents(normalizedPrefabPath);
             if (prefabRoot == null)
             {
-                throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             try
             {
-                // 4. 定位源GameObject
-                GameObject sourceGO = GameObjectPathFinder.FindByPath(prefabRoot, sourcePath, sourceSiblingIndex);
-                if (sourceGO == null)
-                {
-                    throw new InvalidOperationException("GameObject not found at path: " + sourcePath + " (siblingIndex=" + sourceSiblingIndex + ")");
-                }
+                GameObject sourceGO = PrefabComponentHandlerUtils.FindGameObjectOrThrow(prefabRoot, sourcePath, sourceSiblingIndex, "sourcePath");
+                GameObject targetParent = PrefabComponentHandlerUtils.FindGameObjectOrThrow(prefabRoot, targetParentPath, 0, "targetParentPath");
 
-                // 5. 定位目标父节点
-                GameObject targetParent = GameObjectPathFinder.FindByPath(prefabRoot, targetParentPath);
-                if (targetParent == null)
-                {
-                    throw new InvalidOperationException("GameObject not found at path: " + targetParentPath);
-                }
-
-                // 6. 验证移动/复制操作
+                // 拦截非法拓扑变更,避免层级循环或无效复制.
                 Transform sourceParent = sourceGO.transform.parent;
 
-                // 移动操作: 验证不能移动到自身或子节点
                 if (!isCopy)
                 {
                     if (targetParent == sourceGO || IsChildOf(targetParent.transform, sourceGO.transform))
@@ -84,7 +68,6 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                         throw new InvalidOperationException("CANNOT_MOVE_TO_SELF_OR_CHILD: 不能将物体移动到其自身或其子节点下: " + sourcePath);
                     }
                 }
-                // 复制操作: 验证不能复制到原父节点
                 else
                 {
                     if (targetParent == sourceParent?.gameObject)
@@ -93,16 +76,15 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                     }
                 }
 
-                // 7. 执行移动或复制操作
-                JsonData result = isCopy 
-                    ? ExecuteCopy(prefabRoot, prefabPath, sourceGO, targetParent, targetSiblingIndex)
-                    : ExecuteMove(prefabRoot, prefabPath, sourceGO, targetParent, targetSiblingIndex, sourcePath);
+                JsonData result = isCopy
+                    ? ExecuteCopy(prefabRoot, normalizedPrefabPath, sourceGO, targetParent, targetSiblingIndex)
+                    : ExecuteMove(prefabRoot, normalizedPrefabPath, sourceGO, targetParent, targetSiblingIndex, sourcePath);
 
                 return result;
             }
             finally
             {
-                // 8. 无论成功或失败，都要卸载预制体编辑场景
+                // 无论成功或失败都卸载编辑场景,避免残留临时对象.
                 PrefabUtility.UnloadPrefabContents(prefabRoot);
             }
         }

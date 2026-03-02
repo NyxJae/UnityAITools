@@ -27,18 +27,14 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             CommandParams parameters = new CommandParams(rawParams);
 
             string prefabPath = parameters.GetString("prefabPath", null);
-            
-            // 参数验证
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
 
             // 加载预制体
-            GameObject prefab = PrefabLoader.LoadPrefab(prefabPath);
+            GameObject prefab = PrefabLoader.LoadPrefab(normalizedPrefabPath);
             if (prefab == null)
             {
-                throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             bool includeInactive = parameters.GetBool("includeInactive", true);
@@ -59,14 +55,14 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                     maxMatches,
                     out totalMatches);
 
-                return HierarchyJsonBuilder.BuildMatchesResult(prefabPath, prefab, matches, totalMatches);
+                return HierarchyJsonBuilder.BuildMatchesResult(normalizedPrefabPath, prefab, matches, totalMatches);
             }
 
             // 默认模式: 遍历层级树
             HierarchyNode hierarchy = HierarchyTraverser.Traverse(prefab, includeInactive, maxDepth);
 
             // 构建结果(使用HierarchyJsonBuilder)
-            return HierarchyJsonBuilder.BuildHierarchyResult(prefabPath, prefab, hierarchy);
+            return HierarchyJsonBuilder.BuildHierarchyResult(normalizedPrefabPath, prefab, hierarchy);
         }
     }
 }

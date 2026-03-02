@@ -64,6 +64,171 @@ namespace UnityAgentSkills.Core
         /// 批次超时,命令未执行.
         /// </summary>
         public const string Skipped = "SKIPPED";
+
+        /// <summary>
+        /// Play Mode 未启动.
+        /// </summary>
+        public const string PlayModeNotActive = "PLAYMODE_NOT_ACTIVE";
+
+        /// <summary>
+        /// Play Mode 启动失败.
+        /// </summary>
+        public const string PlayModeStartFailed = "PLAYMODE_START_FAILED";
+
+        /// <summary>
+        /// Play Mode 已经处于激活态.
+        /// </summary>
+        public const string PlayModeAlreadyActive = "PLAYMODE_ALREADY_ACTIVE";
+
+        /// <summary>
+        /// Play Mode 被手动中断.
+        /// </summary>
+        public const string PlayModeInterrupted = "PLAYMODE_INTERRUPTED";
+
+        /// <summary>
+        /// 目标元素未找到.
+        /// </summary>
+        public const string ElementNotFound = "ELEMENT_NOT_FOUND";
+
+        /// <summary>
+        /// 目标元素不可交互.
+        /// </summary>
+        public const string ElementNotInteractable = "ELEMENT_NOT_INTERACTABLE";
+
+        /// <summary>
+        /// 目标索引非法.
+        /// </summary>
+        public const string InvalidTargetIndex = "INVALID_TARGET_INDEX";
+
+        /// <summary>
+        /// 指定坐标下无可用UI元素.
+        /// </summary>
+        public const string NoElementAtPosition = "NO_ELEMENT_AT_POSITION";
+
+        /// <summary>
+        /// 坐标非法.
+        /// </summary>
+        public const string InvalidCoordinates = "INVALID_COORDINATES";
+
+        /// <summary>
+        /// 不支持的元素类型.
+        /// </summary>
+        public const string UnsupportedElementType = "UNSUPPORTED_ELEMENT_TYPE";
+
+        /// <summary>
+        /// 目标不明确.
+        /// </summary>
+        public const string AmbiguousTarget = "AMBIGUOUS_TARGET";
+
+        /// <summary>
+        /// 目标元素不可见.
+        /// </summary>
+        public const string ElementNotVisible = "ELEMENT_NOT_VISIBLE";
+
+        /// <summary>
+        /// Game 视图不可用.
+        /// </summary>
+        public const string GameViewNotAvailable = "GAMEVIEW_NOT_AVAILABLE";
+
+        /// <summary>
+        /// 截图失败.
+        /// </summary>
+        public const string ScreenshotFailed = "SCREENSHOT_FAILED";
+
+        /// <summary>
+        /// 预制体文件不存在.
+        /// </summary>
+        public const string PrefabNotFound = "PREFAB_NOT_FOUND";
+
+        /// <summary>
+        /// GameObject不存在.
+        /// </summary>
+        public const string GameObjectNotFound = "GAMEOBJECT_NOT_FOUND";
+
+        /// <summary>
+        /// 组件类型不存在.
+        /// </summary>
+        public const string ComponentTypeNotFound = "COMPONENT_TYPE_NOT_FOUND";
+
+        /// <summary>
+        /// 组件类型存在歧义.
+        /// </summary>
+        public const string AmbiguousComponentType = "AMBIGUOUS_COMPONENT_TYPE";
+
+        /// <summary>
+        /// 组件不存在.
+        /// </summary>
+        public const string ComponentNotFound = "COMPONENT_NOT_FOUND";
+
+        /// <summary>
+        /// 组件已存在.
+        /// </summary>
+        public const string ComponentAlreadyExists = "COMPONENT_ALREADY_EXISTS";
+
+        /// <summary>
+        /// 不能删除必需组件.
+        /// </summary>
+        public const string CannotDeleteRequiredComponent = "CANNOT_DELETE_REQUIRED_COMPONENT";
+
+        /// <summary>
+        /// 属性不存在.
+        /// </summary>
+        public const string PropertyNotFound = "PROPERTY_NOT_FOUND";
+
+        /// <summary>
+        /// 属性路径非法.
+        /// </summary>
+        public const string InvalidPropertyPath = "INVALID_PROPERTY_PATH";
+
+        /// <summary>
+        /// 类型不匹配.
+        /// </summary>
+        public const string TypeMismatch = "TYPE_MISMATCH";
+
+        /// <summary>
+        /// 引用目标不存在.
+        /// </summary>
+        public const string ReferenceTargetNotFound = "REFERENCE_TARGET_NOT_FOUND";
+
+        /// <summary>
+        /// 引用目标类型不匹配.
+        /// </summary>
+        public const string ReferenceTargetTypeMismatch = "REFERENCE_TARGET_TYPE_MISMATCH";
+
+        /// <summary>
+        /// 资源不存在.
+        /// </summary>
+        public const string AssetNotFound = "ASSET_NOT_FOUND";
+
+        /// <summary>
+        /// 资源类型不匹配.
+        /// </summary>
+        public const string AssetTypeMismatch = "ASSET_TYPE_MISMATCH";
+
+        /// <summary>
+        /// properties对象为空.
+        /// </summary>
+        public const string EmptyProperties = "EMPTY_PROPERTIES";
+
+        /// <summary>
+        /// modifications数组为空或缺失.
+        /// </summary>
+        public const string EmptyModifications = "EMPTY_MODIFICATIONS";
+
+        /// <summary>
+        /// 未找到指定ID.
+        /// </summary>
+        public const string IdNotFound = "ID_NOT_FOUND";
+
+        /// <summary>
+        /// 索引超出范围.
+        /// </summary>
+        public const string IndexOutOfRange = "INDEX_OUT_OF_RANGE";
+
+        /// <summary>
+        /// 仅允许在编辑模式执行.
+        /// </summary>
+        public const string OnlyAllowedInEditMode = "ONLY_ALLOWED_IN_EDIT_MODE";
     }
 
     /// <summary>
@@ -179,10 +344,13 @@ namespace UnityAgentSkills.Core
                 {
                     errorJsonData["detail"] = error.detail;
                 }
+
                 jsonData["error"] = errorJsonData;
             }
 
-            if (status == UnityAgentSkillCommandStatuses.Success)
+            if (status == UnityAgentSkillCommandStatuses.Success ||
+                (string.IsNullOrEmpty(status) && result != null) ||
+                (status == UnityAgentSkillCommandStatuses.Error && result != null))
             {
                 jsonData["result"] = result ?? new JsonData();
             }
@@ -321,10 +489,13 @@ namespace UnityAgentSkills.Core
                 {
                     errorJsonData["detail"] = error.detail;
                 }
+
                 jsonData["error"] = errorJsonData;
             }
 
-            if (status == UnityAgentSkillCommandStatuses.Success)
+            if (status == UnityAgentSkillCommandStatuses.Success ||
+                (string.IsNullOrEmpty(status) && result != null) ||
+                (status == UnityAgentSkillCommandStatuses.Error && result != null))
             {
                 jsonData["result"] = result ?? new JsonData();
             }

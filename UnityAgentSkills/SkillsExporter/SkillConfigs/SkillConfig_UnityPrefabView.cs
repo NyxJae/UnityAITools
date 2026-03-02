@@ -37,15 +37,15 @@ description: 查看 Unity 预制体信息. 触发关键词:Unity:预制体,Unity
 
 **最简单的调用方式** - 直接命令行传参(推荐):
 
-> 💡 使用 `python` 或 `uv run` 执行.注意,以防命令行对多行字符串处理异常,请将JSON参数写在一行内.
+> 💡 可使用 `python` 或 `uv run` 执行,推荐 `uv run`.注意,以防命令行对多行字符串处理异常,请将JSON参数写在一行内.
 > 💡 脚本最好加引号包裹,避免路径解析问题.
 
 **命令 1: prefab.queryHierarchy (查询层级结构)**
 
-单命令示例 (python):
+单命令示例 (uv run):
 
 ```bash
-python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_hierarchy_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""includeInactive"":true,""maxDepth"":-1}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_hierarchy_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""includeInactive"":true,""maxDepth"":-1}}]}'
 ```
 
 **命令参数说明**:
@@ -156,17 +156,16 @@ python ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 单命令示例 (uv run):
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""],""includeBuiltin"":false,""includePrivateFields"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""transform"",""k3""],""includePrivateFields"":false}}]}'
 ```
 
 **prefab.queryComponents 参数说明**:
 
-- `prefabPath` 必填,预制体绝对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
+- `prefabPath` 必填,Unity 工程内 Assets 相对路径(必须以 ""Assets/"" 开头),例如 ""Assets/Prefabs/DialogMain.prefab""
 - 路径分隔符自动适配,支持 Windows 反斜杠(\) 和 macOS/Linux 正斜杠(/)
 - `objectPath` 必填,GameObject 层级路径(从 prefab.queryHierarchy 返回的 path 字段获取)
-- `siblingIndex` 可选,同级索引(从 0 开始),用于定位同路径下的同名对象,默认 0
-- `componentFilter` 可选,组件类型过滤,null 表示全部
-- `includeBuiltin` 可选,是否包含 Unity 内置组件(RectTransform, Transform 等),默认 false
+- `siblingIndex` 可选,同名对象序号(从 0 开始),用于定位同路径下的同名对象,默认 0
+- `componentFilter` 可选,组件名称模糊过滤(contains + IgnoreCase + OR),`null`/空数组/空字符串表示不过滤,返回所有组件(含内置组件)
 - `includePrivateFields` 可选,是否包含私有字段(带 SerializeField 标记的),默认 false
 
 **prefab.queryComponents 返回结果示例**:
@@ -201,18 +200,70 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 }
 ```
 
+**命令 3: prefab.createGameObject (创建子物体)**
+
+关键参数:
+- `prefabPath`,`name` 必填.
+- `parentPath` 可选,不传时默认 prefab 根节点.
+- `parentSiblingIndex` 默认 0,用于同名父节点定位.
+- `insertSiblingIndex` 默认 -1,-1 表示插入到末尾.
+- `initialProperties` 可选,支持 `name`,`tag`,`layer`,`isActive`,`isStatic`,`hideFlags`.
+
+关键返回:
+- `createdObjectPath`,`createdSiblingIndex`,`insertSiblingIndexApplied`,`instanceID`,`saved`.
+
+**命令 4: prefab.addComponent (添加组件)**
+
+关键参数:
+- `prefabPath`,`objectPath`,`componentType` 必填.
+- `siblingIndex` 默认 0.
+- `initialProperties` 可选,用于组件初始属性写入.
+
+关键返回:
+- `componentType`,`componentIndex`,`componentInstanceID`,`instanceID`,`saved`.
+
+**命令 5: prefab.setComponentProperties (修改组件属性)**
+
+关键参数:
+- `prefabPath`,`objectPath`,`componentType`,`properties` 必填.
+- `siblingIndex` 默认 0.
+- `componentIndex` 默认 0,按同类型组件计数.
+- `properties` 支持基础类型,数组,嵌套对象,以及 `$ref` 引用协议.
+
+`$ref` 支持:
+- `kind=prefabGameObject`
+- `kind=prefabComponent`
+- `kind=asset`
+- 也支持 `null` 置空引用.
+
+关键返回:
+- `componentType`,`componentIndex`,`componentInstanceID`,`modifiedProperties`,`saved`.
+
+**命令 6: prefab.deleteComponent (删除组件)**
+
+关键参数:
+- `prefabPath`,`objectPath`,`componentType` 必填.
+- `siblingIndex` 默认 0.
+- `componentIndex` 默认 0.
+
+关键返回:
+- `deletedComponentType`,`deletedComponentIndex`,`deletedComponentInstanceID`,`saved`.
+
+**新增错误码(节选)**:
+- `PREFAB_NOT_FOUND`,`GAMEOBJECT_NOT_FOUND`,`COMPONENT_TYPE_NOT_FOUND`,`AMBIGUOUS_COMPONENT_TYPE`,`COMPONENT_NOT_FOUND`
+- `COMPONENT_ALREADY_EXISTS`,`CANNOT_DELETE_REQUIRED_COMPONENT`,`PROPERTY_NOT_FOUND`,`INVALID_PROPERTY_PATH`,`TYPE_MISMATCH`
+- `REFERENCE_TARGET_NOT_FOUND`,`REFERENCE_TARGET_TYPE_MISMATCH`,`ASSET_NOT_FOUND`,`ASSET_TYPE_MISMATCH`,`EMPTY_PROPERTIES`
+
 **批量命令示例** (组合两个命令):
 
 ```bash
 uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_full_001"",""timeout"":30000,""commands"":[{""id"":""cmd_hierarchy"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}},{""id"":""cmd_components"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""]}}]}'
 ```
 
-**Python代码调用** (备选方式):
+**代码调用说明**:
 
-```python
-from scripts.execute_unity_command import execute_command
-result = execute_command({""batchId"":""x"",""commands"":[{""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}}]})
-```
+- 如需在脚本中调用,可使用 `python` 或 `uv run` 执行 `<Scripts Directory>/execute_unity_command.py`.
+- `uv run` 更现代,建议优先使用.
 
 ### Notes
 

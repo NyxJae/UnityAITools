@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Globalization;
 using System.IO;
 using LitJson2_utf;
 using UnityAgentSkills.Core;
@@ -9,7 +11,6 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
 {
     /// <summary>
     /// log.screenshot 命令处理器.
-    /// 只负责生成截图计划与触发截图,不在此处阻塞等待落盘.
     /// </summary>
     internal static class LogScreenshotCommandHandler
     {
@@ -23,26 +24,96 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
 
         internal readonly struct ScreenshotJob
         {
+            /// <summary>
+            /// 截图文件绝对路径.
+            /// </summary>
             public readonly string pngAbsolutePath;
 
-            public ScreenshotJob(string pngAbsolutePath)
+            /// <summary>
+            /// 可选红框区域.
+            /// </summary>
+            public readonly HighlightRectData? highlightRect;
+
+            public ScreenshotJob(string pngAbsolutePath, HighlightRectData? highlightRect)
             {
                 this.pngAbsolutePath = pngAbsolutePath;
+                this.highlightRect = highlightRect;
+            }
+        }
+
+        internal readonly struct HighlightRectData
+        {
+            /// <summary>
+            /// 红框左边界.
+            /// </summary>
+            public readonly float xMin;
+
+            /// <summary>
+            /// 红框右边界.
+            /// </summary>
+            public readonly float xMax;
+
+            /// <summary>
+            /// 红框下边界.
+            /// </summary>
+            public readonly float yMin;
+
+            /// <summary>
+            /// 红框上边界.
+            /// </summary>
+            public readonly float yMax;
+
+            public HighlightRectData(float xMin, float xMax, float yMin, float yMax)
+            {
+                this.xMin = xMin;
+                this.xMax = xMax;
+                this.yMin = yMin;
+                this.yMax = yMax;
             }
         }
 
         /// <summary>
-        /// 旧同步接口(保留,但不推荐在 Editor Update 主循环中直接调用).
-        /// 当前框架会通过异步状态机在外层等待文件可读后再写入 success.
+        /// 兼容入口: 立即触发截图并返回路径信息.
+        /// 实际文件可读与红框处理由外层跨帧轮询完成.
         /// </summary>
         public static JsonData Execute(JsonData rawParams)
         {
             ScreenshotJob job = CreateJob(rawParams);
             BeginCapture(job);
+            return BuildSuccessResult(job, false);
+        }
 
-            // 注意: 此处不等待落盘,仅返回产物路径.
-            // 最终 success=文件可读 的语义由外层批次执行状态机保证.
-            return BuildSuccessResult(job);
+
+
+        /// <summary>
+        /// 跨帧轮询截图完成状态.
+        /// 返回 true 表示命令已完成(成功或失败),false 表示继续等待.
+        /// </summary>
+        internal static bool TryComplete(ScreenshotJob job, DateTime captureStartedAt, DateTime now, out JsonData resultData, out CommandError error)
+        {
+            resultData = null;
+            error = null;
+
+            if (!IsFileReadablePng(job.pngAbsolutePath))
+            {
+                int elapsedMs = (int)(now - captureStartedAt).TotalMilliseconds;
+                if (elapsedMs > ScreenshotReadyTimeoutMs)
+                {
+                    error = CommandErrorFactory.CreateTimeoutError(elapsedMs, ScreenshotReadyTimeoutMs);
+                    return true;
+                }
+
+                return false;
+            }
+
+            bool highlightApplied = false;
+            if (job.highlightRect.HasValue)
+            {
+                highlightApplied = TryApplyHighlight(job.pngAbsolutePath, job.highlightRect.Value);
+            }
+
+            resultData = BuildSuccessResult(job, highlightApplied);
+            return true;
         }
 
         /// <summary>
@@ -55,23 +126,23 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
                 throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": params must be an object");
             }
 
+            ValidateAllowedFields(rawParams);
+
             CommandParams parameters = new CommandParams(rawParams);
 
-            // 上下文参数(由执行器注入,不属于对外协议字段)
             string batchId = parameters.GetString("__batchId", "");
             string cmdId = parameters.GetString("__cmdId", "");
             int screenshotCommandCount = parameters.GetInt("__screenshotCommandCount", 1);
+            HighlightRectData? highlightRect = ParseHighlightRect(rawParams);
 
             if (string.IsNullOrEmpty(batchId) || string.IsNullOrEmpty(cmdId))
             {
-                // 这里属于框架内部错误,用 runtime error 走异常.
                 throw new InvalidOperationException("Missing injected context fields: __batchId/__cmdId");
             }
 
-            // 命名规则: 同一 batch 仅 1 条截图时用 batchId,否则 batchId_cmdId.
             string baseName = screenshotCommandCount <= 1 ? batchId : (batchId + "_" + cmdId);
             string pngPath = Path.Combine(UnityAgentSkillsConfig.ResultsDirAbsolutePath, baseName + ".png");
-            return new ScreenshotJob(pngPath);
+            return new ScreenshotJob(pngPath, highlightRect);
         }
 
         /// <summary>
@@ -84,7 +155,6 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
                 throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": missing png path");
             }
 
-            // 覆盖规则: 若已存在,先删再写,避免读取到旧文件.
             try
             {
                 if (File.Exists(job.pngAbsolutePath))
@@ -94,21 +164,18 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
             }
             catch
             {
-                // 忽略删除失败,让后续写入尝试覆盖.
             }
 
             EnsureGameViewFocused();
-
-            // Edit 模式可用: ScreenCapture.CaptureScreenshot.
-            // 注意: Unity 会在后续帧落盘,因此需要外层非阻塞等待文件可读.
             ScreenCapture.CaptureScreenshot(job.pngAbsolutePath);
         }
 
-        internal static JsonData BuildSuccessResult(ScreenshotJob job)
+        internal static JsonData BuildSuccessResult(ScreenshotJob job, bool highlightApplied)
         {
             JsonData result = new JsonData();
             result["mode"] = "single";
             result["imageAbsolutePath"] = job.pngAbsolutePath;
+            result["highlightApplied"] = highlightApplied;
             return result;
         }
 
@@ -125,6 +192,174 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
             catch
             {
                 return false;
+            }
+        }
+
+
+
+        private static void ValidateAllowedFields(JsonData rawParams)
+        {
+            if (rawParams == null || !rawParams.IsObject)
+            {
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": params must be an object");
+            }
+
+            foreach (DictionaryEntry entry in (IDictionary)rawParams)
+            {
+                string key = entry.Key as string;
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                if (string.Equals(key, "highlightRect", StringComparison.Ordinal) ||
+                    string.Equals(key, "__batchId", StringComparison.Ordinal) ||
+                    string.Equals(key, "__cmdId", StringComparison.Ordinal) ||
+                    string.Equals(key, "__screenshotCommandCount", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": unsupported field " + key);
+            }
+        }
+
+        private static HighlightRectData? ParseHighlightRect(JsonData rawParams)
+        {
+            if (rawParams == null || !rawParams.IsObject || !rawParams.ContainsKey("highlightRect"))
+            {
+                return null;
+            }
+
+            JsonData highlightRect = rawParams["highlightRect"];
+            if (highlightRect == null || !highlightRect.IsObject)
+            {
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": highlightRect must be object");
+            }
+
+            float xMin = ParseRequiredRectField(highlightRect, "xMin");
+            float xMax = ParseRequiredRectField(highlightRect, "xMax");
+            float yMin = ParseRequiredRectField(highlightRect, "yMin");
+            float yMax = ParseRequiredRectField(highlightRect, "yMax");
+
+            if (xMin > xMax || yMin > yMax)
+            {
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": highlightRect requires xMin<=xMax and yMin<=yMax");
+            }
+
+            return new HighlightRectData(xMin, xMax, yMin, yMax);
+        }
+
+        private static float ParseRequiredRectField(JsonData rect, string field)
+        {
+            if (rect == null || !rect.IsObject || !rect.ContainsKey(field))
+            {
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": missing highlightRect." + field);
+            }
+
+            return ParseFloatValue(rect[field], "highlightRect." + field);
+        }
+
+        private static float ParseFloatValue(JsonData value, string field)
+        {
+            if (value == null)
+            {
+                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": invalid " + field);
+            }
+
+            if (value.IsInt)
+            {
+                return (int)value;
+            }
+
+            if (value.IsLong)
+            {
+                return (long)value;
+            }
+
+            if (value.IsDouble)
+            {
+                return (float)(double)value;
+            }
+
+            if (value.IsString)
+            {
+                float parsed;
+                if (float.TryParse(value.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": invalid " + field);
+        }
+
+        private static bool TryApplyHighlight(string pngPath, HighlightRectData rect)
+        {
+            Texture2D texture = null;
+            try
+            {
+                byte[] bytes = File.ReadAllBytes(pngPath);
+                texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (!texture.LoadImage(bytes))
+                {
+                    return false;
+                }
+
+                int width = texture.width;
+                int height = texture.height;
+                if (width <= 0 || height <= 0)
+                {
+                    return false;
+                }
+
+                int minX = Mathf.Clamp(Mathf.RoundToInt(rect.xMin), 0, width - 1);
+                int maxX = Mathf.Clamp(Mathf.RoundToInt(rect.xMax), 0, width - 1);
+                int minY = Mathf.Clamp(Mathf.RoundToInt(rect.yMin), 0, height - 1);
+                int maxY = Mathf.Clamp(Mathf.RoundToInt(rect.yMax), 0, height - 1);
+
+                if (minX > maxX || minY > maxY)
+                {
+                    return false;
+                }
+
+                Color borderColor = Color.red;
+                int thickness = 2;
+
+                for (int t = 0; t < thickness; t++)
+                {
+                    int left = Mathf.Clamp(minX + t, 0, width - 1);
+                    int right = Mathf.Clamp(maxX - t, 0, width - 1);
+                    int bottom = Mathf.Clamp(minY + t, 0, height - 1);
+                    int top = Mathf.Clamp(maxY - t, 0, height - 1);
+
+                    for (int x = left; x <= right; x++)
+                    {
+                        texture.SetPixel(x, bottom, borderColor);
+                        texture.SetPixel(x, top, borderColor);
+                    }
+
+                    for (int y = bottom; y <= top; y++)
+                    {
+                        texture.SetPixel(left, y, borderColor);
+                        texture.SetPixel(right, y, borderColor);
+                    }
+                }
+
+                texture.Apply(false, false);
+                File.WriteAllBytes(pngPath, texture.EncodeToPNG());
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+            finally
+            {
+                if (texture != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
             }
         }
 
@@ -146,8 +381,6 @@ namespace UnityAgentSkills.Plugins.Log.Handlers
 
                 gameView.Show();
                 gameView.Focus();
-
-                // 触发重绘,提高截屏稳定性.
                 gameView.Repaint();
                 EditorApplication.QueuePlayerLoopUpdate();
             }

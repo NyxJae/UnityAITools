@@ -27,32 +27,20 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             CommandParams parameters = new CommandParams(rawParams);
 
             string prefabPath = parameters.GetString("prefabPath", null);
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
             string objectPath = parameters.GetString("objectPath", null);
             int siblingIndex = parameters.GetInt("siblingIndex", 0);
 
-            // 参数验证
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
-            if (string.IsNullOrEmpty(objectPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": objectPath is required");
-            }
-
             // 加载预制体
-            GameObject prefab = PrefabLoader.LoadPrefab(prefabPath);
+            GameObject prefab = PrefabLoader.LoadPrefab(normalizedPrefabPath);
             if (prefab == null)
             {
-                throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             // 定位目标GameObject
-            GameObject target = GameObjectPathFinder.FindByPath(prefab, objectPath, siblingIndex);
-            if (target == null)
-            {
-                throw new InvalidOperationException("GameObject not found at path: " + objectPath + " (siblingIndex=" + siblingIndex + ")");
-            }
+            GameObject target = PrefabComponentHandlerUtils.FindGameObjectOrThrow(prefab, objectPath, siblingIndex, "objectPath");
 
             // 获取组件过滤参数
             string[] componentFilter = null;
@@ -61,7 +49,6 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                 if (parameters.Has("componentFilter"))
                 {
                     JsonData componentFilterData = parameters.GetData()["componentFilter"];
-                    // 检查是否为 null
                     if (componentFilterData == null)
                     {
                         componentFilter = null;
@@ -77,16 +64,16 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
                     }
                 }
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                Debug.LogError($"[PrefabQueryComponentsHandler] Error getting componentFilter: {ex.Message}\n{ex.StackTrace}");
+                Debug.LogError("[PrefabQueryComponentsHandler] Error getting componentFilter: " + ex.Message + "\n" + ex.StackTrace);
             }
-            bool includeBuiltin = parameters.GetBool("includeBuiltin", false);
+
             bool includePrivateFields = parameters.GetBool("includePrivateFields", false);
 
             // 读取组件
             var components = ComponentPropertyReader.ReadComponents(
-                target, componentFilter, includeBuiltin, includePrivateFields);
+                target, componentFilter, includePrivateFields);
 
             // 构建结果(使用ComponentJsonBuilder)
             return ComponentJsonBuilder.BuildComponentsResult(objectPath, target, components);

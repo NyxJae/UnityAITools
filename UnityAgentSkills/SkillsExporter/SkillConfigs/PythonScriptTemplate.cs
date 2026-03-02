@@ -134,8 +134,36 @@ if __name__ == ""__main__"":
         # 执行命令
         result = execute_command(input_json_str)
 
-        # 输出结果(JSON格式,便于解析)
-        print(json.dumps(result, indent=2, ensure_ascii=False))
+        # 输出结果(JSON格式,便于解析).超过阈值时截断stdout,避免命令行输出过大导致调用超时.
+        MAX_STDOUT_CHARS = 8000
+        output_json = json.dumps(result, indent=2, ensure_ascii=False)
+        if len(output_json) <= MAX_STDOUT_CHARS:
+            print(output_json)
+        else:
+            result_file = result.get(""_resultFile"", ""(unknown)"")
+            # 输出摘要: _resultFile + status + 截断提示
+            summary = {
+                ""_resultFile"": result_file,
+                ""_truncated"": True,
+                ""_fullLength"": len(output_json),
+                ""_message"": f""Result too large ({len(output_json)} chars), truncated. Full result saved to: {result_file}"",
+                ""batchId"": result.get(""batchId""),
+                ""status"": result.get(""status""),
+                ""totalCommands"": result.get(""totalCommands""),
+                ""successCount"": result.get(""successCount""),
+                ""failedCount"": result.get(""failedCount""),
+            }
+            # 附加每个命令的 id/type/status(不含 result 数据)
+            results_list = result.get(""results"", [])
+            if results_list:
+                cmd_summaries = []
+                for r in results_list:
+                    cmd_summary = {""id"": r.get(""id""), ""type"": r.get(""type""), ""status"": r.get(""status"")}
+                    if r.get(""status"") != ""success"":
+                        cmd_summary[""error""] = r.get(""error"")
+                    cmd_summaries.append(cmd_summary)
+                summary[""results""] = cmd_summaries
+            print(json.dumps(summary, indent=2, ensure_ascii=False))
 
     except TimeoutError as e:
         print(f""Error: {e}"", file=sys.stderr)

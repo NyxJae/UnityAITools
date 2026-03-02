@@ -29,18 +29,10 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             CommandParams parameters = new CommandParams(rawParams);
 
             string prefabPath = parameters.GetString("prefabPath", null);
+            string normalizedPrefabPath = PrefabComponentHandlerUtils.NormalizePrefabPath(prefabPath);
+            PrefabComponentHandlerUtils.ValidatePrefabPathOrThrow(normalizedPrefabPath);
             string objectPath = parameters.GetString("objectPath", null);
             int siblingIndex = parameters.GetInt("siblingIndex", 0);
-
-            // 参数验证
-            if (string.IsNullOrEmpty(prefabPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": prefabPath is required");
-            }
-            if (string.IsNullOrEmpty(objectPath))
-            {
-                throw new ArgumentException(UnityAgentSkillCommandErrorCodes.InvalidFields + ": objectPath is required");
-            }
 
             // 获取properties参数
             if (!parameters.Has("properties"))
@@ -55,29 +47,25 @@ namespace UnityAgentSkills.Plugins.Prefab.Handlers
             }
 
             // 加载预制体
-            GameObject prefab = PrefabLoader.LoadPrefab(prefabPath);
+            GameObject prefab = PrefabLoader.LoadPrefab(normalizedPrefabPath);
             if (prefab == null)
             {
-                throw new InvalidOperationException("Prefab not found at path: " + prefabPath);
+                throw new InvalidOperationException(UnityAgentSkillCommandErrorCodes.PrefabNotFound + ": 预制体文件不存在: " + normalizedPrefabPath);
             }
 
             // 定位目标GameObject
-            GameObject target = GameObjectPathFinder.FindByPath(prefab, objectPath, siblingIndex);
-            if (target == null)
-            {
-                throw new InvalidOperationException("GameObject not found at path: " + objectPath + " (siblingIndex=" + siblingIndex + ")");
-            }
+            GameObject target = PrefabComponentHandlerUtils.FindGameObjectOrThrow(prefab, objectPath, siblingIndex, "objectPath");
 
             // 修改属性
             List<GameObjectPropertyModifier.PropertyChange> modifiedProperties;
             JsonData currentProperties = GameObjectPropertyModifier.ModifyProperties(target, properties, out modifiedProperties);
 
             // 保存预制体
-            bool saved = GameObjectPropertyModifier.SavePrefab(prefab, prefabPath);
+            bool saved = GameObjectPropertyModifier.SavePrefab(prefab, normalizedPrefabPath);
 
             // 构建结果
             JsonData result = JsonResultBuilder.CreateObject();
-            result["prefabPath"] = prefabPath;
+            result["prefabPath"] = normalizedPrefabPath;
             result["objectPath"] = objectPath;
             result["instanceID"] = target.GetInstanceID();
             result["currentProperties"] = currentProperties;

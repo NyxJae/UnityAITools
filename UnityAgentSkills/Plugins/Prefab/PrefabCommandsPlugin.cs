@@ -26,6 +26,10 @@ namespace UnityAgentSkills.Plugins.Prefab
             registry.Register("prefab.setGameObjectProperties", PrefabSetGameObjectPropertiesHandler.Execute);
             registry.Register("prefab.deleteGameObject", PrefabDeleteGameObjectHandler.Execute);
             registry.Register("prefab.moveOrCopyGameObject", PrefabMoveOrCopyGameObjectHandler.Execute);
+            registry.Register("prefab.createGameObject", PrefabCreateGameObjectHandler.Execute);
+            registry.Register("prefab.addComponent", PrefabAddComponentHandler.Execute);
+            registry.Register("prefab.setComponentProperties", PrefabSetComponentPropertiesHandler.Execute);
+            registry.Register("prefab.deleteComponent", PrefabDeleteComponentHandler.Execute);
         }
 
         /// <summary>
