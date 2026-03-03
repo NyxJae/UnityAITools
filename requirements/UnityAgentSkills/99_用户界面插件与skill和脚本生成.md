@@ -19,8 +19,8 @@
 - `prefab.queryHierarchy` - 预制体层级查询(Prefab 插件,priority 20)
 - `prefab.queryComponents` - 预制体组件查询（Prefab 插件，Priority 20）
 - `prefab.setGameObjectProperties` - GameObject 属性修改（Prefab 插件，Priority 20）
-- `k3prefab.queryByK3Id` - K3 组件查询（K3Prefab 插件，Priority 100）
-- `k3prefab.setComponentProperties` - K3 组件属性修改（K3Prefab 插件，Priority 100）
+- `prefab.queryByUIId` - UI 组件查询（Prefab 插件，Priority 20）
+- `prefab.setComponentProperties` - UI 组件属性修改（Prefab 插件，Priority 20）
 
 详见 `01_整体与框架需求.md` 第 6 节"模块化/可扩展性要求"。
 
@@ -146,7 +146,7 @@ SkillsExporter UI 中可选择并导出的 skills 固定为 3 个:
 
 - `unity-log`
 - `unity-prefab-view`
-- `unity-k3-prefab`
+- `unity-ui-prefab`
 
 不提供任何旧 skillId 的 alias/兼容入口.
 
@@ -322,7 +322,7 @@ DONE_DIR = join(UNITY_AGENT_SKILLS_DATA_DIR, "done")
 1. 用户点击 `Tools/Unity-skills` 菜单项
 2. 弹窗显示，导出路径显示为空或默认值
 3. 用户点击「修改按钮」，选择路径 `C:/Users/xxx/.snow/skills`
-4. 用户点击「全选」按钮，选中所有技能（共 3 个：unity-log, unity-prefab-view, unity-k3-prefab）
+4. 用户点击「全选」按钮，选中所有技能（共 3 个：unity-log, unity-prefab-view, unity-ui-prefab）
 5. 用户点击「导出选中技能」按钮
 6. 插件创建 `C:/Users/xxx/.snow/skills/skills/` 文件夹
 7. 插件生成 `unity-log/` 文件夹，包含：
@@ -346,7 +346,7 @@ C:/Users/xxx/.snow/skills/
     │   ├── SKILL.md
     │   └── scripts/
     │       └── execute_unity_command.py
-    └── unity-k3-prefab/
+    └── unity-ui-prefab/
         ├── SKILL.md
         └── scripts/
             └── execute_unity_command.py
@@ -631,7 +631,7 @@ Code/Assets/Editor/UnityAgentSkills/
 │       ├── SkillConfigsRegistry.cs          # 集中配置
 │       ├── SkillConfig_UnityLog.cs          # 日志技能配置(含查询与截图)
 │       ├── SkillConfig_UnityPrefabView.cs   # 预制体查看技能配置
-│       ├── SkillConfig_UnityK3Prefab.cs     # K3预制体技能配置
+│       ├── SkillConfig_UnityPrefab.cs       # UI预制体技能配置
 │       └── PythonScriptTemplate.cs          # Python脚本模板
 └── (现有的其他文件...)
 ```

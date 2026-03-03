@@ -48,13 +48,7 @@ namespace UnityAgentSkills.SkillsExporter
                         Markdown = SkillConfig_UnityPrefabView.SkillMarkdown
                     }
                 },
-                { SkillConfig_UnityK3Prefab.SkillName, new SkillConfig
-                    {
-                        Name = SkillConfig_UnityK3Prefab.SkillName,
-                        Description = SkillConfig_UnityK3Prefab.SkillDescription,
-                        Markdown = SkillConfig_UnityK3Prefab.SkillMarkdown
-                    }
-                },
+
                 { SkillConfig_UnityPlayMode.SkillName, new SkillConfig
                     {
                         Name = SkillConfig_UnityPlayMode.SkillName,

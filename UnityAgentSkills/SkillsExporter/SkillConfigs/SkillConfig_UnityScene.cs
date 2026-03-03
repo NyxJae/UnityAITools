@@ -150,9 +150,9 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_sc
             ""truncated"": false,
             ""matches"": [
               {
-                ""name"": ""K3Button_Confirm"",
+                ""name"": ""UIButton_Confirm"",
                 ""instanceID"": 345678901,
-                ""path"": ""Main/Panel_Content/K3Button_Confirm"",
+                ""path"": ""Main/Panel_Content/UIButton_Confirm"",
                 ""siblingIndex"": 0,
                 ""depth"": 2,
                 ""isActive"": true
@@ -171,7 +171,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_sc
 单命令示例 (uv run):
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_scene_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""scene.queryComponents"",""params"":{""sceneName"":""Main"",""objectPath"":""Main/Panel_Content/K3Button_Confirm"",""componentFilter"":[""transform"",""k3""],""includePrivateFields"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_scene_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""scene.queryComponents"",""params"":{""sceneName"":""Main"",""objectPath"":""Main/Panel_Content/UIButton_Confirm"",""componentFilter"":[""transform"",""ui""],""includePrivateFields"":false}}]}'
 ```
 
 **scene.queryComponents 参数说明**:
@@ -195,14 +195,14 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_sc
       ""status"": ""success"",
       ""result"": {
         ""sceneName"": ""Main"",
-        ""objectPath"": ""Main/Panel_Content/K3Button_Confirm"",
+        ""objectPath"": ""Main/Panel_Content/UIButton_Confirm"",
         ""instanceID"": 345678901,
         ""totalComponents"": 1,
         ""components"": [
           {
-            ""type"": ""K3Button"",
+            ""type"": ""UIButton"",
             ""instanceID"": 789012345,
-            ""scriptPath"": ""Assets/Scripts/HotUpdate/K3Engine/Component/K3Button.cs"",
+            ""scriptPath"": ""Assets/Scripts/HotUpdate/UIEngine/Component/UIButton.cs"",
             ""properties"": {
               ""interactable"": true,
               ""transitionType"": 0
@@ -242,13 +242,13 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_sc
 
 **处理同名对象示例**:
 
-如果场景中存在多个同名 GameObject (如两个 K3Button_Confirm):
+如果场景中存在多个同名 GameObject (如两个 UIButton_Confirm):
 1. 从 scene.queryHierarchy 返回结果中获取目标对象的 siblingIndex
 2. 调用 scene.queryComponents 时传入 siblingIndex 参数精确定位
 
 ```bash
-# 查询第二个 K3Button_Confirm (siblingIndex=1)
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""x"",""commands"":[{""type"":""scene.queryComponents"",""params"":{""sceneName"":""Main"",""objectPath"":""Main/Panel_Content/K3Button_Confirm"",""siblingIndex"":1}}]}'
+# 查询第二个 UIButton_Confirm (siblingIndex=1)
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""x"",""commands"":[{""type"":""scene.queryComponents"",""params"":{""sceneName"":""Main"",""objectPath"":""Main/Panel_Content/UIButton_Confirm"",""siblingIndex"":1}}]}'
 ```
 ";
     }

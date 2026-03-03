@@ -23,7 +23,7 @@ namespace UnityAgentSkills.Core
         /// 优先级分层建议:
         /// - 0-9: 元能力层(log.query, system.status等核心命令)
         /// - 10-99: 官方插件层(prefab.*, asset.*等Unity通用能力)
-        /// - 100+: 扩展插件层(k3prefab.*等项目专用能力)
+        /// - 100+: 扩展插件层(prefab.*等项目专用能力)
         /// </summary>
         public int Priority { get; set; }
 

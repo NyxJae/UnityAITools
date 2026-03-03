@@ -129,9 +129,9 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
         ""truncated"": false,
         ""matches"": [
           {
-            ""name"": ""K3Button_Confirm"",
+            ""name"": ""UIButton_Confirm"",
             ""instanceID"": 345678901,
-            ""path"": ""DialogMain/Panel_Content/K3Button_Confirm"",
+            ""path"": ""DialogMain/Panel_Content/UIButton_Confirm"",
             ""depth"": 2,
             ""siblingIndex"": 0,
             ""isActive"": true
@@ -156,7 +156,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 单命令示例 (uv run):
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""transform"",""k3""],""includePrivateFields"":false}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_components_001"",""timeout"":30000,""commands"":[{""id"":""cmd_001"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/UIButton_Confirm"",""componentFilter"":[""transform"",""ui""],""includePrivateFields"":false}}]}'
 ```
 
 **prefab.queryComponents 参数说明**:
@@ -180,14 +180,14 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
       ""type"": ""prefab.queryComponents"",
       ""status"": ""success"",
       ""result"": {
-        ""objectPath"": ""DialogMain/Panel_Content/K3Button_Confirm"",
+        ""objectPath"": ""DialogMain/Panel_Content/UIButton_Confirm"",
         ""instanceID"": 345678901,
         ""totalComponents"": 1,
         ""components"": [
           {
-            ""type"": ""K3Button"",
+            ""type"": ""UIButton"",
             ""instanceID"": 789012345,
-            ""scriptPath"": ""Assets/Scripts/HotUpdate/K3Engine/Component/K3Button.cs"",
+            ""scriptPath"": ""Assets/Scripts/HotUpdate/UIEngine/Component/UIButton.cs"",
             ""properties"": {
               ""interactable"": true,
               ""transitionType"": 0
@@ -257,7 +257,7 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 **批量命令示例** (组合两个命令):
 
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_full_001"",""timeout"":30000,""commands"":[{""id"":""cmd_hierarchy"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}},{""id"":""cmd_components"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""componentFilter"":[""K3Button""]}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_prefab_full_001"",""timeout"":30000,""commands"":[{""id"":""cmd_hierarchy"",""type"":""prefab.queryHierarchy"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab""}},{""id"":""cmd_components"",""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/Resources/Prefabs/DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/UIButton_Confirm"",""componentFilter"":[""UIButton""]}}]}'
 ```
 
 **代码调用说明**:
@@ -285,13 +285,13 @@ uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_pr
 
 **处理同名对象示例**:
 
-如果预制体中存在多个同名 GameObject (如两个 K3Button_Confirm):
+如果预制体中存在多个同名 GameObject (如两个 UIButton_Confirm):
 1. 从 prefab.queryHierarchy 返回结果中获取目标对象的 siblingIndex
 2. 调用 prefab.queryComponents 时传入 siblingIndex 参数精确定位
 
 ```bash
-# 查询第二个 K3Button_Confirm (siblingIndex=1)
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""x"",""commands"":[{""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/.../DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/K3Button_Confirm"",""siblingIndex"":1}}]}'
+# 查询第二个 UIButton_Confirm (siblingIndex=1)
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""x"",""commands"":[{""type"":""prefab.queryComponents"",""params"":{""prefabPath"":""Assets/.../DialogMain.prefab"",""objectPath"":""DialogMain/Panel_Content/UIButton_Confirm"",""siblingIndex"":1}}]}'
 ```
 ";
     }
