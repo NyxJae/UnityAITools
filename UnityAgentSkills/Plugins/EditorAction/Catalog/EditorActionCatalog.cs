@@ -152,8 +152,7 @@ namespace UnityAgentSkills.Plugins.EditorAction.Catalog
                 return false;
             }
 
-            if (name.StartsWith("Unity", StringComparison.Ordinal) ||
-                name.StartsWith("System", StringComparison.Ordinal) ||
+            if (name.StartsWith("System", StringComparison.Ordinal) ||
                 name.StartsWith("Microsoft", StringComparison.Ordinal) ||
                 name.StartsWith("mscorlib", StringComparison.Ordinal) ||
                 name.StartsWith("netstandard", StringComparison.Ordinal))

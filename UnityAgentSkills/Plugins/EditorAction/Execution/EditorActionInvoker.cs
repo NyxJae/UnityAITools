@@ -189,7 +189,7 @@ namespace UnityAgentSkills.Plugins.EditorAction.Execution
         {
             if (value == null)
             {
-                return new JsonData();
+                return null;
             }
 
             if (value is JsonData jsonData)

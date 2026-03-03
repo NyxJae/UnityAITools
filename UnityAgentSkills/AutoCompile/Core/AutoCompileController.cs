@@ -39,7 +39,6 @@ namespace UnityAgentSkills.AutoCompile
         private static List<FileMonitorService> _services = new List<FileMonitorService>();
         private static readonly ConcurrentQueue<string> _changedFilesQueue = new ConcurrentQueue<string>();
         private static double _debounceEndTime;
-        private static bool _isInitialized = false;
 
         /// <summary>
         /// 初始化 AutoCompile 控制器.
@@ -62,8 +61,6 @@ namespace UnityAgentSkills.AutoCompile
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
-            _isInitialized = true;
-
             if (_config.IsEnabled)
             {
                 StartService();
@@ -85,7 +82,6 @@ namespace UnityAgentSkills.AutoCompile
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
 
             _config = null;
-            _isInitialized = false;
             SetStatus(Status.Stopped);
         }
 

@@ -50,15 +50,20 @@ description: 运行 Unity 编辑器动作. 触发关键词:Unity:编辑器命令
 - `params.actionArgs` 可选,用于参数绑定.
 
 **单命令示例** (uv run):
-
 ```bash
-uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_editor_action_001"",""timeout"":60000,""commands"":[{""id"":""cmd_001"",""type"":""editor.runAction"",""params"":{""actionId"":""AssetsTools.AssetsExportor.ExportLuaAssetBundle""}}]}'
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_editor_action_001"",""timeout"":60000,""commands"":[{""id"":""cmd_001"",""type"":""editor.runAction"",""params"":{""actionId"":""UnityEditor.AssetDatabase.SaveAssets""}}]}'
 ```
 
 **带参数示例** (uv run):
 
 ```bash
 uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_editor_action_002"",""timeout"":60000,""commands"":[{""id"":""cmd_001"",""type"":""editor.runAction"",""params"":{""actionId"":""UnityAgentSkills.Core.CommandErrorFactory.CreateSkippedError"",""actionArgs"":{""batchTimeoutMs"":5000}}}]}'
+```
+
+**多命令示例** (uv run):
+
+```bash
+uv run ""<Scripts Directory>/execute_unity_command.py"" '{""batchId"":""batch_editor_action_003"",""timeout"":60000,""commands"":[{""id"":""cmd_001"",""type"":""editor.runAction"",""params"":{""actionId"":""UnityAgentSkills.UI.SkillsExporterWindow.RestartCommandServiceMenu""}},{""id"":""cmd_002"",""type"":""editor.runAction"",""params"":{""actionId"":""UnityEditor.AssetDatabase.Refresh""}}]}'
 ```
 
 ---
