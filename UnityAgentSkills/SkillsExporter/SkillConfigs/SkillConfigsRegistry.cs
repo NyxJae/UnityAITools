@@ -68,6 +68,13 @@ namespace UnityAgentSkills.SkillsExporter
                         Description = SkillConfig_UnityScene.SkillDescription,
                         Markdown = SkillConfig_UnityScene.SkillMarkdown
                     }
+                },
+                { SkillConfig_UnityEditorAction.SkillName, new SkillConfig
+                    {
+                        Name = SkillConfig_UnityEditorAction.SkillName,
+                        Description = SkillConfig_UnityEditorAction.SkillDescription,
+                        Markdown = SkillConfig_UnityEditorAction.SkillMarkdown
+                    }
                 }
             };
         }
