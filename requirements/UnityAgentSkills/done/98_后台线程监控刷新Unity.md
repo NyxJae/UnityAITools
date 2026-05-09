@@ -16,7 +16,7 @@
 
 - 插件化命令执行框架.
 - 有 SkillsExporterWindow 窗口(菜单: Tools/Unity-skills).
-- 当前为单页面窗口,只支持技能导出功能.
+- 当前为单页面窗口,提供一键导出功能.
 
 ### 1.2 问题
 
@@ -27,7 +27,7 @@
 将 AutoCompileOnOutOfFocus 的核心功能融合进 UnityAgentSkills 项目:
 
 - **作为后台服务自动运行**: 使用 `[InitializeOnLoad]` 在编辑器启动时自动初始化服务.
-- **集成配置界面**: 在 SkillsExporterWindow 中添加新的 tab 页,提供 AutoCompile 配置选项.
+- **集成配置界面**: 在 SkillsExporterWindow 中添加新的 tab 页,提供 AutoCompile 配置选项(与技能导出 tab 并列).
 - **保持原有功能**: 保留 AutoCompileOnOutOfFocus 的核心能力(焦点外自动编译).
 
 ---
@@ -45,7 +45,7 @@
 - [ ] **配置界面（新增 tab 页）**
 
   - SkillsExporterWindow 重构为 tab 结构
-  - Tab 1：技能导出（现有功能）
+  - Tab 1：技能导出（一键导出统一技能包）
   - Tab 2：AutoCompile 配置（新增）
   - 配置选项：
     - 启用/禁用自动编译（开关）

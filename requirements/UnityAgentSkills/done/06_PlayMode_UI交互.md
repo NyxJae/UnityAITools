@@ -107,7 +107,7 @@ Unity 原生提供完整的 UI 事件触发 API:
 
 **log.screenshot(跨技能验证能力)**:
 
-- [ ] PlayMode 文档中不再定义独立截图命令,截图统一使用 `unity-log` 技能的 `log.screenshot`
+- [ ] PlayMode 文档中不再定义独立截图命令,截图统一使用 `unity-agent-skills` 技能主文档中的 `log.screenshot`
 - [ ] `playmode.waitAndScreenshot` 已删除且不向后兼容
 - [ ] `log.screenshot` 仅支持可选 `highlightRect`(红框标注),不再支持 `waitSeconds`
 - [ ] `highlightRect` 格式为 `{xMin,xMax,yMin,yMax}`,越界自动裁剪到图像边界
@@ -498,7 +498,7 @@ Unity 原生提供完整的 UI 事件触发 API:
 }
 ```
 
-**log.screenshot(由 unity-log 技能提供)**:
+**log.screenshot(由 unity-agent-skills 技能提供)**:
 
 用于截图验证当前画面,支持可选红框标注区域.
 
@@ -767,7 +767,7 @@ interactable = visible
 - 命中时返回 `waitOutcome="matched"`,`matchedBy`,`matchedElement`
 - 到时返回 `waitOutcome="timeoutReached"`,命令状态仍为 `success`
 
-**log.screenshot(由 unity-log 技能提供)**:
+**log.screenshot(由 unity-agent-skills 技能提供)**:
 
 | 字段            | 类型   | 必填 | 约束                    | 说明             |
 | --------------- | ------ | ---- | ----------------------- | ---------------- |
