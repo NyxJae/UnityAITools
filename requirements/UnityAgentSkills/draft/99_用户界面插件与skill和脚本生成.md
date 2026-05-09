@@ -62,16 +62,15 @@ unity-agent-skills/
 
 ### 2.2 reference 文档要求
 
-每个 reference 包含：
+每个 reference **只写输入侧**，输出格式和示例由主 SKILL.md 通用协议层统一覆盖：
 
 - 该能力的使用前提与依赖（如编辑前必须先查看）
-- 所含命令的 `params` 参数表
-- 所含命令的 `result` 输出结构
-- 典型输入输出示例
+- 所含命令的 `params` 参数表（核心）
+- 精简的输入示例（1-2 个典型即可，不展开）
 - 常见错误码（仅列出该能力特有的）
-- **末尾**：指向相关 reference 的路径指针（如 prefab-edit.md 末尾指向 prefab-view.md 和 prefab-bridge.md）
+- **末尾**：指向相关 reference 的路径指针
 
-不重复主文档中已有的通用协议说明。
+**不写**输出结构、输出示例、通用协议说明——这些主 SKILL.md 已覆盖，reference 只补差异部分，节省 token。
 
 reference 内容来源于对应的 done/ 需求文档：
 
@@ -188,7 +187,7 @@ SkillsExporter 窗口与 AutoCompile 共享同一个 `SkillsExporterWindow`（`T
 - [ ] 主 SKILL.md 包含通用协议说明、log 三条命令的完整文档、能力目录索引表
 - [ ] 主 SKILL.md 字符数在 8–15K 范围内
 - [ ] 主 SKILL.md frontmatter 满足 Hermes 规范（name、description ≤1024 字符且以 "Use when..." 开头）
-- [ ] 8 个 reference 各有明确的能力边界和交叉引用指针
+- [ ] 8 个 reference 各只写 params 参数表 + 精简输入示例 + 特有错误码 + 交叉引用指针，不重复输出格式
 - [ ] `execute_unity_command.py` 中 `Commands/` 路径已替换为实际绝对路径
 - [ ] `SkillFiles/` 目录结构与导出产物一致
 - [ ] 新增/删除 reference 只需操作文件，不需改 C# 代码
